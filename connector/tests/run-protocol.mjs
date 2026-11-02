@@ -21,6 +21,9 @@ const LEADS = [
   ["保留", "この URL だけでは判定できません"],
 ];
 
+// 作法で禁じた推定や助言の表現。見つかった語を一覧に出す。
+const BANNED = /たぶん|思われ|はず|可能性|典型|通常|一般的|よくある|実在しない|公式アプリ|ブックマーク|クリックしない|削除/g;
+
 const here = dirname(fileURLToPath(import.meta.url));
 const repeat = Number(process.argv[2] ?? 1);
 const only = process.argv.slice(3);
@@ -94,6 +97,8 @@ function parse(out) {
     versioned: /作法 v[\d.]+ で確認/.test(answer),
     verdict,
     chars: answer.length,
+    banned: [...new Set(answer.match(BANNED) ?? [])],
+    unsupportedMismatch: answer.includes("不一致") && !/https?:\/\/(?![^\s]*\.example)/.test(answer),
     tools,
     answer,
   };
@@ -124,9 +129,11 @@ const rows = cases.map((c) => {
     count((r) => r.versioned),
     count((r) => r.fetched),
     Math.round(runs.reduce((a, r) => a + r.chars, 0) / runs.length),
+    [...new Set(runs.flatMap((r) => r.banned))].join("、") || "-",
+    count((r) => r.unsupportedMismatch),
   ];
 });
-const header = ["件名", "期待", "判定", "一致", "呼び出し", "版表示", "取得", "平均文字数"];
+const header = ["件名", "期待", "判定", "一致", "呼び出し", "版表示", "取得", "平均文字数", "禁止語", "根拠なし不一致"];
 const table = [header, header.map(() => "---"), ...rows].map((r) => `| ${r.join(" | ")} |`).join("\n");
 console.log(table);
 
