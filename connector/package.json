@@ -1,0 +1,19 @@
+{
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261102.1",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.156.1"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.4.0",
+    "agents": "^0.32.0",
+    "zod": "^4.6.7"
+  },
+  "name": "bwc-probe",
+  "scripts": {
+    "dev": "wrangler dev --port 8788",
+    "deploy": "wrangler deploy",
+    "check": "tsc --noEmit"
+  },
+  "private": true
+}
