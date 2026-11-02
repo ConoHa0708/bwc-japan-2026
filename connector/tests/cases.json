@@ -1,0 +1,74 @@
+[
+  {
+    "id": "bank-pin-sms",
+    "name": "暗証番号を求める銀行 SMS",
+    "expected": ["黒"],
+    "text": "SMS +1 000-555-0100\n【サンプル銀行】お客様の口座で不正アクセスを検知しました。本日中に本人確認がない場合、お取引を停止します。下記よりログインし、暗証番号とカード番号をご入力ください。\nhttps://sample-bank-verify.example/login"
+  },
+  {
+    "id": "shipping-notice",
+    "name": "要求のない発送通知",
+    "expected": ["白"],
+    "text": "サンプル通販 <info@shop-sample.example>\nご注文の商品を本日発送しました。お届け予定は明日です。お問い合わせ番号は 0000-0000-0000 です。このメールへの返信は不要です。"
+  },
+  {
+    "id": "card-login",
+    "name": "ログインだけ求める明細通知",
+    "expected": ["グレー"],
+    "text": "サンプルカード <notice@sample-card.example>\nご利用明細を更新しました。下記からログインしてご確認ください。\nhttps://sample-card-member.example/login"
+  },
+  {
+    "id": "delivery-no-url",
+    "name": "URL のない配達確認",
+    "expected": ["グレー"],
+    "text": "SMS 090-0000-0000\nお荷物の配達について確認事項があります。詳細はこちらをご確認ください。"
+  },
+  {
+    "id": "neighborhood",
+    "name": "町内会だより",
+    "expected": ["白"],
+    "text": "町内会だより\n今週の土曜日、午前9時から公園の清掃を行います。軍手をお持ちください。雨天の場合は中止です。"
+  },
+  {
+    "id": "power-discount",
+    "name": "期限のない電力の割引案内",
+    "expected": ["グレー"],
+    "text": "サンプル電力 お客さま窓口 <support@sample-denryoku.example>\nいつもご利用ありがとうございます。料金プランの改定に伴い、今月より割引が適用されるお客さまのご案内です。お手続きは任意で、期限はございません。ご希望の方は会員ページの登録情報をご確認ください。\nhttps://mypage.sample-denryoku.example/"
+  },
+  {
+    "id": "family-number",
+    "name": "番号変更を告げる家族の SMS",
+    "expected": ["グレー"],
+    "text": "SMS 090-0000-0000\nお母さん、スマホが壊れて番号が変わりました。こちらに登録しておいてね。今度また連絡します。"
+  },
+  {
+    "id": "card-phone",
+    "name": "電話を求めるカードの連絡",
+    "expected": ["グレー"],
+    "text": "サンプル銀行 カードサービス\n山田 花子 様\nお客さまのカードについて確認させていただきたい点がございます。ご都合のよいときに、専用窓口までお電話をお願いいたします。受付 平日9時〜17時\n0120-000-000"
+  },
+  {
+    "id": "city-line",
+    "name": "LINE へ誘導する給付金の案内",
+    "expected": ["グレー"],
+    "text": "サンプル市 福祉課\n令和8年度の給付金について、対象世帯の皆さまへお知らせします。受け取りには口座の登録が必要です。担当者がご案内しますので、窓口の LINE をお友だち登録してください。\nLINE ID: sample-city-kyufu"
+  },
+  {
+    "id": "shared-doc",
+    "name": "ログインを求める知人の資料共有",
+    "expected": ["グレー"],
+    "text": "佐藤 <sato@sample-corp.example>\n先日はありがとうございました。お話ししていた資料を共有します。閲覧にはいつものアカウントでのログインをお願いします。\nhttps://docs.sample-corp.example/share/0000"
+  },
+  {
+    "id": "delivery-app",
+    "name": "アプリを配る宅配の案内",
+    "expected": ["黒"],
+    "text": "SMS サンプル宅配 お届けのお知らせ\nお荷物をお預かりしています。再配達のご希望は、下記のアプリからお受けしています。\nhttps://sample-takuhai.example/app/download"
+  },
+  {
+    "id": "url-only",
+    "name": "URL のみ",
+    "expected": ["保留"],
+    "text": "https://sample-bank-verify.example/login"
+  }
+]

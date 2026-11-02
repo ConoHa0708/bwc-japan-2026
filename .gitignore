@@ -8,6 +8,9 @@
 # Cloudflare Workers
 .wrangler/
 
+# Test results
+connector/tests/results/
+
 # Node
 node_modules/
 *.log

@@ -1,0 +1,137 @@
+// 公開中のコネクターに模擬文面を渡し、呼び出しと判定を一覧にする。
+// 使い方: node tests/run-protocol.mjs [1件あたりの回数] [case id ...]
+// 道具の呼び出しを強制し、作法の判定と回答の形だけを測る。
+// 呼び出されるかどうかは Claude アプリの実機で確かめる。
+import { spawn } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const SERVER = "bwc";
+const TOOL = `mcp__${SERVER}__get_judgment_protocol`;
+const URL_MCP = "https://bwc-probe.taka-bwc-japan-2026.workers.dev/mcp";
+const CONCURRENCY = 3;
+const TIMEOUT_MS = 180_000;
+
+const LEADS = [
+  ["黒", "フィッシング詐欺の疑い大、入力しないでください"],
+  ["グレー", "詐欺となる根拠が複数確認されています。アクセスはお控えください"],
+  ["白", "現時点で黒と判断できる内容は含まれていませんでした"],
+  ["保留", "この URL だけでは判定できません"],
+];
+
+const here = dirname(fileURLToPath(import.meta.url));
+const repeat = Number(process.argv[2] ?? 1);
+const only = process.argv.slice(3);
+const cases = JSON.parse(readFileSync(join(here, "cases.json"), "utf8")).filter(
+  (c) => only.length === 0 || only.includes(c.id),
+);
+
+const work = mkdtempSync(join(tmpdir(), "bwc-protocol-"));
+const config = join(work, "mcp.json");
+writeFileSync(config, JSON.stringify({ mcpServers: { [SERVER]: { type: "http", url: URL_MCP } } }));
+
+// Claude Code の中から実行しても、通常のターミナルと同じログインを使う。
+// CLAUDE.md の口調などを混ぜず、道具も最初から読み込ませる。
+const cleanEnv = {
+  ...Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !/^(CLAUDE|ANTHROPIC_BASE_URL)/.test(key)),
+  ),
+  CLAUDE_CODE_DISABLE_CLAUDE_MDS: "1",
+  ENABLE_TOOL_SEARCH: "false",
+};
+
+const SYSTEM_PROMPT = `あなたは Claude です。利用者の最初のメッセージに対し、最初に必ず ${TOOL} を呼び、返された作法に従って日本語で回答してください。`;
+const systemPromptFile = join(work, "system.txt");
+writeFileSync(systemPromptFile, SYSTEM_PROMPT);
+
+function runOnce(testCase) {
+  return new Promise((resolve) => {
+    const args = [
+      "-p",
+      "--model", "sonnet",
+      "--output-format", "stream-json",
+      "--verbose",
+      "--no-session-persistence",
+      "--setting-sources", "project",
+      "--system-prompt-file", `"${systemPromptFile}"`,
+      "--strict-mcp-config",
+      "--mcp-config", `"${config}"`,
+      "--allowedTools", `"${TOOL},WebSearch,WebFetch"`,
+    ];
+    const child = spawn("claude", args, { cwd: work, shell: true, env: cleanEnv });
+    let out = "";
+    const timer = setTimeout(() => child.kill(), TIMEOUT_MS);
+    child.stdout.on("data", (d) => (out += d));
+    child.on("close", () => {
+      clearTimeout(timer);
+      resolve(parse(out));
+    });
+    child.stdin.end(testCase.text);
+  });
+}
+
+function parse(out) {
+  const tools = [];
+  let answer = "";
+  for (const line of out.split(/\r?\n/)) {
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    for (const block of event.message?.content ?? []) {
+      if (block.type === "tool_use") tools.push(block.name);
+    }
+    if (event.type === "result") answer = event.result ?? "";
+  }
+  const verdict = LEADS.find(([, lead]) => answer.includes(lead))?.[0] ?? "その他";
+  return {
+    called: tools.includes(TOOL),
+    fetched: tools.includes("WebFetch"),
+    versioned: /作法 v[\d.]+ で確認/.test(answer),
+    verdict,
+    chars: answer.length,
+    tools,
+    answer,
+  };
+}
+
+const jobs = cases.flatMap((c) => Array.from({ length: repeat }, () => c));
+const results = [];
+let next = 0;
+async function worker() {
+  while (next < jobs.length) {
+    const testCase = jobs[next++];
+    const result = await runOnce(testCase);
+    results.push({ id: testCase.id, name: testCase.name, expected: testCase.expected, ...result });
+    console.error(`${results.length}/${jobs.length} ${testCase.id}: ${result.verdict}`);
+  }
+}
+await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+
+const rows = cases.map((c) => {
+  const runs = results.filter((r) => r.id === c.id);
+  const count = (fn) => `${runs.filter(fn).length}/${runs.length}`;
+  return [
+    c.name,
+    c.expected.join("・"),
+    runs.map((r) => r.verdict).join(" "),
+    count((r) => c.expected.includes(r.verdict)),
+    count((r) => r.called),
+    count((r) => r.versioned),
+    count((r) => r.fetched),
+    Math.round(runs.reduce((a, r) => a + r.chars, 0) / runs.length),
+  ];
+});
+const header = ["件名", "期待", "判定", "一致", "呼び出し", "版表示", "取得", "平均文字数"];
+const table = [header, header.map(() => "---"), ...rows].map((r) => `| ${r.join(" | ")} |`).join("\n");
+console.log(table);
+
+const outDir = join(here, "results");
+mkdirSync(outDir, { recursive: true });
+const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+writeFileSync(join(outDir, `${stamp}.json`), JSON.stringify(results, null, 2));
+writeFileSync(join(outDir, `${stamp}.md`), `${table}\n`);
