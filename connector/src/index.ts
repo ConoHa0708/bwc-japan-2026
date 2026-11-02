@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
 import { PROTOCOL_TEXT, PROTOCOL_VERSION } from "./protocol";
+import { expandShortUrl } from "./shorturl";
 
 function createServer() {
   const server = new McpServer({ name: "bwc-probe", version: PROTOCOL_VERSION });
@@ -37,6 +38,23 @@ function createServer() {
         }),
       );
       return { content: [{ type: "text", text: PROTOCOL_TEXT }] };
+    },
+  );
+  server.registerTool(
+    "expand_short_url",
+    {
+      title: "短縮 URL の行き先を確認",
+      description:
+        "短縮 URL が見えたら、行き先のドメインを照合する前に呼ぶ。短縮サービスにだけ問い合わせ、転送先のサイトは開かない。",
+      inputSchema: {
+        url: z.string().describe("短縮 URL"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+    },
+    async ({ url }) => {
+      const result = await expandShortUrl(url);
+      console.log(JSON.stringify({ tool: "expand_short_url", status: result.status, hops: result.hops }));
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
     },
   );
   return server;

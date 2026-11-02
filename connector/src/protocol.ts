@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = "0.12.0";
+export const PROTOCOL_VERSION = "0.13.0";
 
 export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッシング）
 
@@ -23,6 +23,10 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 10. SMS の発信者番号の種類（0005 で始まる10桁、海外の番号、アルファベット、携帯番号、固定電話番号、その他）
 11. メールの認証アイコン、＋メッセージの認証済みマークの有無
 12. メールヘッダーがある場合の SPF、DKIM、DMARC の結果（原文のまま）
+
+■ 短縮 URL
+- 短縮 URL が見えたら expand_short_url を呼び、返された final_url で照合する。final_url のサイトは取得しない。
+- status が failed のときは、行き先を「取得出来ず」としてグレーにする。
 
 ■ 正規ドメインとの照合
 - そのサービスのログイン先などを組織の公式ページで確認できたうえで一致しない場合だけ「不一致」とする。「不一致」と書くときは、確認した公式ページの URL を根拠に必ず書く。書けなければ「照合出来ず」とする。
