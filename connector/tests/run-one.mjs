@@ -1,0 +1,103 @@
+// 1件だけ診断し、回答をそのまま表示する。画像と再診断にも対応する。
+// 使い方:
+//   node tests/run-one.mjs --text "本文"
+//   node tests/run-one.mjs --image path/to/screenshot.png
+//   node tests/run-one.mjs --image path/to/screenshot.png --answer "SMS で届きました"
+// --answer を付けると、最初の診断の会話の続きで答えを送り、再診断を表示する。
+import { spawn } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { parseArgs } from "node:util";
+
+const SERVER = "bwc";
+const URL_MCP = "https://bwc-probe.taka-bwc-japan-2026.workers.dev/mcp";
+const TOOLS = ["get_judgment_protocol", "score_observations", "expand_short_url"].map((t) => `mcp__${SERVER}__${t}`);
+
+const { values } = parseArgs({
+  options: { text: { type: "string" }, image: { type: "string" }, answer: { type: "string" } },
+});
+if (!values.text && !values.image) {
+  console.error("--text か --image を指定してください");
+  process.exit(1);
+}
+
+const work = mkdtempSync(join(tmpdir(), "bwc-one-"));
+const config = join(work, "mcp.json");
+writeFileSync(config, JSON.stringify({ mcpServers: { [SERVER]: { type: "http", url: URL_MCP } } }));
+const systemPromptFile = join(work, "system.txt");
+writeFileSync(
+  systemPromptFile,
+  `あなたは Claude です。利用者が共有したものに対し、最初に必ず ${TOOLS[0]} を呼び、返された作法に従って日本語で回答してください。`,
+);
+
+// CLAUDE.md の口調などを混ぜず、通常のターミナルと同じログインを使う。
+const env = {
+  ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(CLAUDE|ANTHROPIC_BASE_URL)/.test(key))),
+  CLAUDE_CODE_DISABLE_CLAUDE_MDS: "1",
+  ENABLE_TOOL_SEARCH: "false",
+};
+
+function run(prompt, sessionId) {
+  const allowed = [...TOOLS, "WebSearch", "WebFetch", "Read"];
+  const args = [
+    "-p",
+    "--model", "sonnet",
+    "--output-format", "stream-json",
+    "--verbose",
+    "--setting-sources", "project",
+    "--system-prompt-file", `"${systemPromptFile}"`,
+    "--strict-mcp-config",
+    "--mcp-config", `"${config}"`,
+    "--allowedTools", `"${allowed.join(",")}"`,
+  ];
+  if (values.image) args.push("--add-dir", `"${resolve(values.image, "..")}"`);
+  if (sessionId) args.push("--resume", sessionId);
+  return new Promise((done) => {
+    const child = spawn("claude", args, { cwd: work, shell: true, env });
+    let out = "";
+    child.stdout.on("data", (d) => (out += d));
+    child.on("close", () => {
+      const result = { tools: [], scores: [], answer: "", sessionId: null };
+      for (const line of out.split(/\r?\n/)) {
+        let event;
+        try {
+          event = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        for (const block of event.message?.content ?? []) {
+          if (block.type === "tool_use") {
+            result.tools.push(block.name);
+            if (block.name.endsWith("score_observations")) result.scores.push(block.input);
+          }
+        }
+        if (event.type === "result") {
+          result.answer = event.result ?? "";
+          result.sessionId = event.session_id ?? null;
+        }
+      }
+      done(result);
+    });
+    child.stdin.end(prompt);
+  });
+}
+
+function show(title, r) {
+  console.log(`===== ${title} =====`);
+  console.log(`呼び出した道具: ${r.tools.join(", ") || "なし"}`);
+  for (const s of r.scores) console.log(`送った観点: ${s.observations.map((o) => o.id).join(", ")}`);
+  console.log("");
+  console.log(r.answer);
+  console.log("");
+}
+
+const first = await run(
+  values.image ? `この画像を共有します: ${resolve(values.image)}` : values.text,
+);
+show("診断", first);
+
+if (values.answer && first.sessionId) {
+  const second = await run(values.answer, first.sessionId);
+  show(`再診断（答え: ${values.answer}）`, second);
+}
