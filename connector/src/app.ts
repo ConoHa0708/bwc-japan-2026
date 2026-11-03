@@ -74,7 +74,7 @@ const HTML = `<!DOCTYPE html>
       return;
     }
     const again = await app.callServerTool({
-      name: "phishing_check",
+      name: "score_observations",
       arguments: { checklist: sc.checklist, evidence: sc.evidence, targets: sc.targets, device_registrations: found },
     });
     $("note").textContent = "この端末で確認した登録日で採点し直しました: " + found.map((f) => f.domain + " " + f.registration).join("、");

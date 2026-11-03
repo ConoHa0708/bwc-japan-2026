@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SERVER = "bwc";
-const TOOL = `mcp__${SERVER}__phishing_check`;
+const TOOL = `mcp__${SERVER}__get_judgment_protocol`;
 const URL_MCP = "https://bwc-probe.taka-bwc-japan-2026.workers.dev/mcp";
 const CONCURRENCY = 3;
 const TIMEOUT_MS = 180_000;
@@ -63,7 +63,7 @@ function runOnceRaw(testCase) {
       "--system-prompt-file", `"${systemPromptFile}"`,
       "--strict-mcp-config",
       "--mcp-config", `"${config}"`,
-      "--allowedTools", `"${TOOL},WebSearch,WebFetch"`,
+      "--allowedTools", `"${TOOL},mcp__${SERVER}__score_observations,WebSearch,WebFetch"`,
     ];
     const child = spawn("claude", args, { cwd: work, shell: true, env: cleanEnv });
     let out = "";
