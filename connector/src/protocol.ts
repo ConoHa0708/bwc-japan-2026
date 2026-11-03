@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = "0.16.0";
+export const PROTOCOL_VERSION = "0.17.0";
 
 export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッシング）
 
@@ -29,6 +29,9 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 - input_credentials: ID、パスワード、暗証番号の入力を求めている
 - input_card_or_account: カード番号や口座情報の入力を求めている
 - input_id_document: 本人確認書類の画像を求めている
+- authority_money_request: 警察、検察、官公庁などを名乗り、振込、送金、資金の移動を求めている
+- money_transfer_request: 振込、送金、指定口座への資金の移動を求めている
+- sender_mismatch_verified: 差出人アドレスのドメインを、名乗る組織の公式ページで確認したドメインと照合し、一致しない。evidence に確認した公式ページの URL を必ず書く。書けないときは送らない
 - financial_credential_request: 金融機関を名乗るメールか SMS の本文そのものが、ID、パスワード、暗証番号、カード番号などの入力や返信を明記している。ログインへの誘導だけなら送らない
 - tax_or_delivery_sms_link: 国税庁か配達業者の名称が見える SMS に、実際のリンクが見える
 - offstore_app: アプリの導入へ誘導するリンクの行き先が App Store や Google Play ではない

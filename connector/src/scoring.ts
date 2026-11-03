@@ -12,6 +12,9 @@ export const SIGNALS = {
   input_credentials: { points: 30, label: "ID、パスワード、暗証番号の入力を求めている" },
   input_card_or_account: { points: 30, label: "カード番号や口座情報の入力を求めている" },
   input_id_document: { points: 20, label: "本人確認書類の画像を求めている" },
+  authority_money_request: { points: 80, label: "警察や公的機関を名乗り、振込や資金の移動を求めている" },
+  money_transfer_request: { points: 40, label: "振込や送金、指定口座への資金の移動を求めている" },
+  sender_mismatch_verified: { points: 40, label: "差出人のドメインが、公式ページで確認した組織のドメインと一致しない" },
   financial_credential_request: { points: 50, label: "金融機関を名乗るメールか SMS で、認証情報の入力や返信を求めている" },
   tax_or_delivery_sms_link: { points: 50, label: "国税庁か配達業者を名乗る SMS にリンクがある" },
   offstore_app: { points: 60, label: "公式ストア以外からのアプリ導入へ誘導している" },
@@ -48,6 +51,21 @@ const ACTIONS = {
   ],
 } as const;
 
+// 観点に応じて対処方法に足す文。
+const EXTRA_ACTIONS: Partial<Record<SignalId, string>> = {
+  authority_money_request: "振り込まないでください。警察が現金の振り込みを求めることはありません（警視庁）。",
+  money_transfer_request: "振り込みや送金はしないでください。",
+  lure_to_other_contact: "表示された電話番号や連絡先には連絡しないでください。",
+  offstore_app: "アプリは入れないでください。",
+  app_install_request: "アプリは入れないでください。",
+};
+
+function extraActions(ids: SignalId[]) {
+  // 警察を名乗る振込要求があれば、一般の振込の文は重ねない。
+  const skip = ids.includes("authority_money_request") ? new Set<SignalId>(["money_transfer_request"]) : new Set<SignalId>();
+  return [...new Set(ids.filter((id) => !skip.has(id)).map((id) => EXTRA_ACTIONS[id]).filter((a): a is string => Boolean(a)))];
+}
+
 export type Observation = { id: SignalId; evidence: string };
 
 export function score(observations: Observation[]) {
@@ -78,6 +96,7 @@ export function score(observations: Observation[]) {
       : ["・加点なし"]),
     "",
     "【対処方法】",
+    ...(verdict === "白" ? [] : extraActions(details.map((d) => d.id)).map((a) => `・${a}`)),
     ...ACTIONS[verdict].map((a) => `・${a}`),
     "",
     `作法 v${PROTOCOL_VERSION} で確認`,
