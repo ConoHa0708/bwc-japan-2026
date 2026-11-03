@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = "0.28.0";
+export const PROTOCOL_VERSION = "0.29.0";
 
 export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッシング）
 
@@ -22,15 +22,15 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 ■ 観点
 - org_claim: 実在の組織を名乗っている
 - login_mismatch_verified: そのサービスのログイン先を組織の公式ページで確認し、実際のドメインが一致しない。evidence に確認した公式ページの URL を必ず書く。書けないときは送らない
-- domain_differs_from_main: 検索で確かめた組織の公式ドメインと、画面や本文のドメインが異なる（ログイン先までは確かめられない場合）
+- domain_differs_from_main: 検索で確かめた組織の公式ドメインと、リンク先やアドレスバーのドメインが異なる（ログイン先までは確かめられない場合）。差出人のアドレスには使わない。login_mismatch_verified が true なら false にする
 - org_in_subdomain: 組織名がサブドメインにあり、登録ドメインは別
 - destination_unknown: リンクやボタンの行き先が見えない（メールのボタンなど）。短縮 URL はコネクターが調べるため、短縮 URL を理由にしない
-- input_credentials: ID、パスワード、暗証番号の入力を求めている
-- input_card_or_account: カード番号や口座情報の入力を求めている
-- input_id_document: 本人確認書類の画像を求めている
+- input_credentials: ID、パスワード、暗証番号の入力欄が見える、または本文がそれらの入力を明記している。ログインへの誘導や「お忘れの場合」などの案内だけなら false
+- input_card_or_account: カード番号や口座情報の入力欄が見える、または本文がそれらの入力を明記している。「お支払い方法の更新」などの案内だけなら false
+- input_id_document: 本人確認書類の画像の提出を求める文が見える
 - authority_money_request: 警察、検察、官公庁などを名乗り、振込、送金、資金の移動を求めている
 - money_transfer_request: 振込、送金、指定口座への資金の移動を求めている
-- sender_mismatch_verified: 差出人アドレスのドメインを、名乗る組織の公式ページで確認したドメインと照合し、一致しない。evidence に確認した公式ページの URL を必ず書く。書けないときは送らない
+- sender_mismatch_verified: メールの差出人アドレスの @ 以降のドメインを、名乗る組織の公式ページで確認したドメインと照合し、一致しない。evidence に確認した公式ページの URL を必ず書く。書けないときは false。電話番号や SMS の発信者、注意喚起のページに同じ文面があることには使わない
 - financial_credential_request: 金融機関を名乗るメールか SMS の本文そのものが、ID、パスワード、暗証番号、カード番号などの入力や返信を明記している。ログインへの誘導だけなら送らない
 - tax_or_delivery_sms_link: 国税庁か配達業者の名称が見える SMS に、実際のリンクが見える
 - offstore_app: アプリの導入へ誘導するリンクの行き先が App Store や Google Play ではない
@@ -50,5 +50,6 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 
 ■ 質問の決まり（グレーのとき）
 - 届いた経路、画面の続き、リンク先など、点数に関わる情報を1つだけ聞く。
+- メールで差出人のアドレスが見えないときは、「差出人の名前を押すと表示されるメールアドレスを教えてください」と聞く。
 - リンクやボタンを押して確かめるよう求めない。リンクの長押しも求めない。
 `;

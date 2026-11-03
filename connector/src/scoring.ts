@@ -92,13 +92,42 @@ export function observationsFrom(checklist: Checklist, evidence: { id: string; t
   });
 }
 
+// 偽物であることを示す観点。誘導、期限、名乗りなど正規の連絡にもある観点だけでは黒にしない。
+const DECISIVE = new Set<SignalId>([
+  "login_mismatch_verified",
+  "sender_mismatch_verified",
+  "domain_differs_from_main",
+  "org_in_subdomain",
+  "random_subdomain",
+  "new_domain",
+  "authority_money_request",
+  "money_transfer_request",
+  "financial_credential_request",
+  "tax_or_delivery_sms_link",
+  "offstore_app",
+  "sms_foreign_mobile",
+  "dmarc_fail",
+]);
+
+// 同じ事実を重ねて数えないよう、上位の観点があれば下位の観点を外す。
+const SUPERSEDED_BY: Partial<Record<SignalId, SignalId>> = {
+  domain_differs_from_main: "login_mismatch_verified",
+  app_install_request: "offstore_app",
+  money_transfer_request: "authority_money_request",
+};
+
 export function score(observations: Observation[]) {
   const seen = new Map<SignalId, string>();
   for (const o of observations) if (!seen.has(o.id)) seen.set(o.id, o.evidence.trim().slice(0, 200));
+  for (const [id, by] of Object.entries(SUPERSEDED_BY) as [SignalId, SignalId][]) if (seen.has(by)) seen.delete(id);
   const details = [...seen].map(([id, evidence]) => ({ id, ...SIGNALS[id], evidence }));
   details.sort((a, b) => b.points - a.points);
-  const total = Math.min(MAX_SCORE, details.reduce((sum, d) => sum + d.points, 0));
+  const sum = Math.min(MAX_SCORE, details.reduce((acc, d) => acc + d.points, 0));
+  const decisive = details.some((d) => DECISIVE.has(d.id));
+  // 偽物の証拠がなければ、合計が高くてもグレーの上限で止める。
+  const total = decisive ? sum : Math.min(sum, BLACK_MIN - 1);
   const verdict = total >= BLACK_MIN ? "黒" : total >= GRAY_MIN ? "グレー" : "白";
+  const capped = !decisive && sum >= BLACK_MIN;
 
   const headline =
     verdict === "黒"
@@ -118,6 +147,7 @@ export function score(observations: Observation[]) {
     ...(details.length
       ? details.map((d) => `・+${d.points} ${d.label}${d.evidence ? `：${d.evidence}` : ""}`)
       : ["・加点なし"]),
+    ...(capped ? [`・合計は${sum}点ですが、偽物であることを示す根拠が見えないため、${BLACK_MIN - 1}点で止めています`] : []),
     "",
     "【対処方法】",
     ...(verdict === "白" ? [] : extraActions(details.map((d) => d.id)).map((a) => `・${a}`)),
