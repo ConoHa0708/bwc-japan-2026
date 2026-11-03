@@ -30,6 +30,7 @@ export const SIGNALS = {
 export type SignalId = keyof typeof SIGNALS;
 export const SIGNAL_IDS = Object.keys(SIGNALS) as [SignalId, ...SignalId[]];
 
+const MAX_SCORE = 100;
 const BLACK_MIN = 80;
 const GRAY_MIN = 20;
 
@@ -73,7 +74,7 @@ export function score(observations: Observation[]) {
   for (const o of observations) if (!seen.has(o.id)) seen.set(o.id, o.evidence.trim().slice(0, 200));
   const details = [...seen].map(([id, evidence]) => ({ id, ...SIGNALS[id], evidence }));
   details.sort((a, b) => b.points - a.points);
-  const total = details.reduce((sum, d) => sum + d.points, 0);
+  const total = Math.min(MAX_SCORE, details.reduce((sum, d) => sum + d.points, 0));
   const verdict = total >= BLACK_MIN ? "黒" : total >= GRAY_MIN ? "グレー" : "白";
 
   const headline =
