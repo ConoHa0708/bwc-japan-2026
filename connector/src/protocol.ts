@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = "0.30.0";
+export const PROTOCOL_VERSION = "0.31.0";
 
 export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッシング）
 
@@ -37,7 +37,7 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 - app_install_request: アプリの導入を求めているが、リンクの行き先が見えない
 - lure_to_login: 本文や画面が、確認、ログイン、認証、検証などの操作へ誘導している（「認証を完了してください」「ご確認ください」なども含む）
 - lure_to_other_contact: 電話や LINE など別の連絡先へ誘導している
-- unusual_characters: 日本で一般的に使わない漢字や字形（簡体字など）が本文に混ざっている。evidence にその文字を含む原文を書く。単なる誤字や変換ミスは送らない
+- unusual_characters: 日本語の文の中に、日本で一般的に使わない漢字や字形（簡体字など）が混ざっている。evidence にその文字を含む原文を書く。ハングルや英語など、他の言語の文や単語が書かれているだけなら false。単なる誤字や変換ミスも false
 - urgency: 期限、停止、制限など、急いで行動させる表現がある
 - sms_foreign_mobile: SMS の発信者が海外の携帯番号
 - sms_domestic_mobile: SMS の発信者が国内の携帯番号
