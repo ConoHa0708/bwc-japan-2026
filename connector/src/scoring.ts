@@ -26,6 +26,9 @@ export const SIGNALS = {
   lure_to_login: { points: 20, label: "本文から確認やログインへ誘導している", rule: "本文から確認やログインへ誘導している" },
   lure_to_other_contact: { points: 20, label: "電話や LINE など別の連絡先へ誘導している", rule: "電話や LINE など別の連絡先へ誘導している" },
   unusual_characters: { points: 15, label: "日本で一般的に使わない漢字や字形が混ざっている", rule: "日本で一般的に使わない漢字や字形（簡体字など）が本文に混ざっている。evidence にその文字を含む原文を書く。単なる誤字や変換ミスはfalse にする" },
+  brand_misspelling: { points: 20, label: "組織名やロゴの綴りが正式な名前と違う" },
+  unnatural_japanese: { points: 15, label: "日本語の語の使い方が不自然" },
+  lookalike_domain: { points: 40, label: "URL のドメインに、見た目の似た別の文字が使われている" },
   urgency: { points: 15, label: "急がせる表現がある", rule: "期限、停止、制限など、急いで行動させる表現がある" },
   sms_foreign_mobile: { points: 80, label: "SMS の発信者が海外の携帯番号", rule: "SMS の発信者が海外の携帯番号" },
   sms_domestic_mobile: { points: 10, label: "SMS の発信者が国内の携帯番号", rule: "SMS の発信者が国内の携帯番号" },
@@ -34,7 +37,7 @@ export const SIGNALS = {
 
 export type SignalId = keyof typeof SIGNALS;
 // コネクターが自分で調べて加点する観点。Claude の確認表には含めない。
-const SERVER_SIGNALS = new Set<SignalId>(["random_subdomain", "new_domain", "short_url"]);
+const SERVER_SIGNALS = new Set<SignalId>(["random_subdomain", "new_domain", "short_url", "lookalike_domain"]);
 export const SIGNAL_IDS = (Object.keys(SIGNALS) as SignalId[]).filter(
   (id) => !SERVER_SIGNALS.has(id),
 ) as [SignalId, ...SignalId[]];
@@ -92,13 +95,45 @@ export function observationsFrom(checklist: Checklist, evidence: { id: string; t
   });
 }
 
+// 偽物であることを示す観点。誘導、期限、名乗りなど正規の連絡にもある観点だけでは黒にしない。
+const DECISIVE = new Set<SignalId>([
+  "login_mismatch_verified",
+  "sender_mismatch_verified",
+  "domain_differs_from_main",
+  "org_in_subdomain",
+  "random_subdomain",
+  "new_domain",
+  "authority_money_request",
+  "money_transfer_request",
+  "financial_credential_request",
+  "tax_or_delivery_sms_link",
+  "offstore_app",
+  "sms_foreign_mobile",
+  "dmarc_fail",
+  "brand_misspelling",
+  "unnatural_japanese",
+  "lookalike_domain",
+]);
+
+// 同じ事実を重ねて数えないよう、上位の観点があれば下位の観点を外す。
+const SUPERSEDED_BY: Partial<Record<SignalId, SignalId>> = {
+  domain_differs_from_main: "login_mismatch_verified",
+  app_install_request: "offstore_app",
+  money_transfer_request: "authority_money_request",
+};
+
 export function score(observations: Observation[]) {
   const seen = new Map<SignalId, string>();
   for (const o of observations) if (!seen.has(o.id)) seen.set(o.id, o.evidence.trim().slice(0, 200));
+  for (const [id, by] of Object.entries(SUPERSEDED_BY) as [SignalId, SignalId][]) if (seen.has(by)) seen.delete(id);
   const details = [...seen].map(([id, evidence]) => ({ id, ...SIGNALS[id], evidence }));
   details.sort((a, b) => b.points - a.points);
-  const total = Math.min(MAX_SCORE, details.reduce((sum, d) => sum + d.points, 0));
+  const sum = Math.min(MAX_SCORE, details.reduce((acc, d) => acc + d.points, 0));
+  const decisive = details.some((d) => DECISIVE.has(d.id));
+  // 偽物の証拠がなければ、合計が高くてもグレーの上限で止める。
+  const total = decisive ? sum : Math.min(sum, BLACK_MIN - 1);
   const verdict = total >= BLACK_MIN ? "黒" : total >= GRAY_MIN ? "グレー" : "白";
+  const capped = !decisive && sum >= BLACK_MIN;
 
   const headline =
     verdict === "黒"
@@ -118,6 +153,7 @@ export function score(observations: Observation[]) {
     ...(details.length
       ? details.map((d) => `・+${d.points} ${d.label}${d.evidence ? `：${d.evidence}` : ""}`)
       : ["・加点なし"]),
+    ...(capped ? [`・合計は${sum}点ですが、偽物であることを示す根拠が見えないため、${BLACK_MIN - 1}点で止めています`] : []),
     "",
     "【対処方法】",
     ...(verdict === "白" ? [] : extraActions(details.map((d) => d.id)).map((a) => `・${a}`)),
@@ -164,6 +200,10 @@ export async function scoreWithDomains(
     if ("tld" in info && info.tld) domains.push({ registered_domain: info.registered_domain, tld: info.tld });
     if (info.random_subdomain) {
       extra.push({ id: "random_subdomain", evidence: `${info.host}（${info.random_labels.join("、")}）` });
+    }
+    // 英数字以外の文字（飾りつきのラテン文字など）を使ったドメインは、変換後に xn-- で始まる部分を持つ。
+    if (/(^|\.)xn--/i.test(info.host)) {
+      extra.push({ id: "lookalike_domain", evidence: `${original}（実際の表記: ${info.host}）` });
     }
     let registration = fromDevice.get(info.registered_domain.toLowerCase());
     let where = "端末で確認";

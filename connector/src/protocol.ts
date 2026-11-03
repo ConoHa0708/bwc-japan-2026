@@ -1,11 +1,11 @@
-export const PROTOCOL_VERSION = "0.28.0";
+export const PROTOCOL_VERSION = "0.33.0";
 
 export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッシング）
 
 ■ 流れ
 1. 画面や本文を、下の観点に沿って観測する。
-2. 組織を名乗っていて URL やドメインが見えるときは、その組織の公式ページを Web 検索で探し、公式のドメインとログイン先を確かめる。偽のページは開かない。
-3. 下のすべての観点について、当てはまるかを1つずつ確かめ、score_observations の checklist に true か false で全部書き、true の根拠を evidence に書く。見えた URL やホスト名は targets に入れる。短縮 URL、サブドメイン、登録日はコネクターが調べる。判定、点数、文面は自分で決めない。
+2. 組織を名乗っていて URL やドメインが見えるときは、その組織自身が運営する公式サイトを Web 検索で探し、公式のドメインとログイン先を確かめる。解説サイト、まとめ記事、ブログ、Q&A サイト、ニュース記事など、組織以外が書いたページは確認元にしない。組織のドメインの上にあっても、コミュニティ、掲示板、利用者の投稿のページは確認元にしない。組織自身のサイトで確かめられなければ「照合出来ず」とする。偽のページは開かない。
+3. 下のすべての観点について、当てはまるかを1つずつ確かめ、score_observations の checklist に true か false で全部書き、true の根拠を evidence に書く。見えた URL やホスト名は targets に入れる。短縮 URL、サブドメイン、似せ文字、登録日はコネクターが調べる。判定、点数、文面は自分で決めない。
 4. 診断結果はカードに表示される。返された文面や点数を回答に書かない。
 5. 判断がグレーのときだけ、「【確認したいこと】」として、診断に必要な情報を1つだけ、1文で質問する。白と黒のときは何も足さない。
 6. 利用者が追加の情報を答えたら、checklist を更新して score_observations を呼び直す。
@@ -21,23 +21,25 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 
 ■ 観点
 - org_claim: 実在の組織を名乗っている
-- login_mismatch_verified: そのサービスのログイン先を組織の公式ページで確認し、実際のドメインが一致しない。evidence に確認した公式ページの URL を必ず書く。書けないときは送らない
-- domain_differs_from_main: 検索で確かめた組織の公式ドメインと、画面や本文のドメインが異なる（ログイン先までは確かめられない場合）
+- login_mismatch_verified: そのサービスのログイン先を組織自身の公式サイトで確認し、実際のドメインが一致しない。evidence に確認した組織自身のページの URL を必ず書く。書けないときは false
+- domain_differs_from_main: 検索で確かめた組織の公式ドメインと、リンク先やアドレスバーのドメインが異なる（ログイン先までは確かめられない場合）。差出人のアドレスには使わない。login_mismatch_verified が true なら false にする
 - org_in_subdomain: 組織名がサブドメインにあり、登録ドメインは別
 - destination_unknown: リンクやボタンの行き先が見えない（メールのボタンなど）。短縮 URL はコネクターが調べるため、短縮 URL を理由にしない
-- input_credentials: ID、パスワード、暗証番号の入力を求めている
-- input_card_or_account: カード番号や口座情報の入力を求めている
-- input_id_document: 本人確認書類の画像を求めている
+- input_credentials: ID、パスワード、暗証番号の入力欄が見える、または本文がそれらの入力を明記している。ログインへの誘導や「お忘れの場合」などの案内だけなら false。メールアドレスやドメインだけの入力欄も false
+- input_card_or_account: カード番号や口座情報の入力欄が見える、または本文がそれらの入力を明記している。「お支払い方法の更新」などの案内だけなら false
+- input_id_document: 本人確認書類の画像の提出を求める文が見える
 - authority_money_request: 警察、検察、官公庁などを名乗り、振込、送金、資金の移動を求めている
 - money_transfer_request: 振込、送金、指定口座への資金の移動を求めている
-- sender_mismatch_verified: 差出人アドレスのドメインを、名乗る組織の公式ページで確認したドメインと照合し、一致しない。evidence に確認した公式ページの URL を必ず書く。書けないときは送らない
+- sender_mismatch_verified: メールの差出人アドレスの @ 以降のドメインを、名乗る組織自身の公式サイトで確認したドメインと照合し、一致しない。evidence に確認した組織自身のページの URL を必ず書く。書けないときは false。電話番号や SMS の発信者、注意喚起のページに同じ文面があることには使わない
 - financial_credential_request: 金融機関を名乗るメールか SMS の本文そのものが、ID、パスワード、暗証番号、カード番号などの入力や返信を明記している。ログインへの誘導だけなら送らない
 - tax_or_delivery_sms_link: 国税庁か配達業者の名称が見える SMS に、実際のリンクが見える
 - offstore_app: アプリの導入へ誘導するリンクの行き先が App Store や Google Play ではない
 - app_install_request: アプリの導入を求めているが、リンクの行き先が見えない
 - lure_to_login: 本文や画面が、確認、ログイン、認証、検証などの操作へ誘導している（「認証を完了してください」「ご確認ください」なども含む）
 - lure_to_other_contact: 電話や LINE など別の連絡先へ誘導している
-- unusual_characters: 日本で一般的に使わない漢字や字形（簡体字など）が本文に混ざっている。evidence にその文字を含む原文を書く。単なる誤字や変換ミスは送らない
+- unusual_characters: 日本語の文の中に、日本で一般的に使わない漢字や字形（簡体字など）が混ざっている。evidence にその文字を含む原文を書く。ハングルや英語など、他の言語の文や単語が書かれているだけなら false。単なる誤字や変換ミスも false
+- brand_misspelling: 組織名やロゴの綴りが、名乗る組織の正式な名前と違う（例: Example を Exmaple と書く）。evidence に画面の綴りを原文のまま書く
+- unnatural_japanese: 日本語の語の使い方が明らかに不自然（例:「口座が違反しています」）。evidence に原文を書く。誤変換1つや敬語の揺れだけなら false
 - urgency: 期限、停止、制限など、急いで行動させる表現がある
 - sms_foreign_mobile: SMS の発信者が海外の携帯番号
 - sms_domestic_mobile: SMS の発信者が国内の携帯番号
@@ -50,5 +52,6 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 
 ■ 質問の決まり（グレーのとき）
 - 届いた経路、画面の続き、リンク先など、点数に関わる情報を1つだけ聞く。
+- メールで差出人のアドレスが見えないときは、「差出人の名前を押すと表示されるメールアドレスを教えてください」と聞く。
 - リンクやボタンを押して確かめるよう求めない。リンクの長押しも求めない。
 `;
