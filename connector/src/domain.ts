@@ -30,7 +30,8 @@ function randomLabels(subdomain: string): string[] {
 }
 
 export async function checkDomain(input: string, { rdap: useRdap = true } = {}) {
-  const host = input.includes("://") ? new URL(input).hostname : input.split("/")[0];
+  // URL として読み直し、英数字以外の文字を使ったドメインを xn-- の表記にそろえる。
+  const host = new URL(input.includes("://") ? input : `http://${input}`).hostname;
   const parsed = parse(host, { allowPrivateDomains: true });
   const registered = parsed.domain;
   const subdomain = parsed.subdomain ?? "";

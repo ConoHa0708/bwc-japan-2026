@@ -26,6 +26,9 @@ export const SIGNALS = {
   lure_to_login: { points: 20, label: "本文から確認やログインへ誘導している", rule: "本文から確認やログインへ誘導している" },
   lure_to_other_contact: { points: 20, label: "電話や LINE など別の連絡先へ誘導している", rule: "電話や LINE など別の連絡先へ誘導している" },
   unusual_characters: { points: 15, label: "日本で一般的に使わない漢字や字形が混ざっている", rule: "日本で一般的に使わない漢字や字形（簡体字など）が本文に混ざっている。evidence にその文字を含む原文を書く。単なる誤字や変換ミスはfalse にする" },
+  brand_misspelling: { points: 20, label: "組織名やロゴの綴りが正式な名前と違う" },
+  unnatural_japanese: { points: 15, label: "日本語の語の使い方が不自然" },
+  lookalike_domain: { points: 40, label: "URL のドメインに、見た目の似た別の文字が使われている" },
   urgency: { points: 15, label: "急がせる表現がある", rule: "期限、停止、制限など、急いで行動させる表現がある" },
   sms_foreign_mobile: { points: 80, label: "SMS の発信者が海外の携帯番号", rule: "SMS の発信者が海外の携帯番号" },
   sms_domestic_mobile: { points: 10, label: "SMS の発信者が国内の携帯番号", rule: "SMS の発信者が国内の携帯番号" },
@@ -34,7 +37,7 @@ export const SIGNALS = {
 
 export type SignalId = keyof typeof SIGNALS;
 // コネクターが自分で調べて加点する観点。Claude の確認表には含めない。
-const SERVER_SIGNALS = new Set<SignalId>(["random_subdomain", "new_domain", "short_url"]);
+const SERVER_SIGNALS = new Set<SignalId>(["random_subdomain", "new_domain", "short_url", "lookalike_domain"]);
 export const SIGNAL_IDS = (Object.keys(SIGNALS) as SignalId[]).filter(
   (id) => !SERVER_SIGNALS.has(id),
 ) as [SignalId, ...SignalId[]];
@@ -107,6 +110,9 @@ const DECISIVE = new Set<SignalId>([
   "offstore_app",
   "sms_foreign_mobile",
   "dmarc_fail",
+  "brand_misspelling",
+  "unnatural_japanese",
+  "lookalike_domain",
 ]);
 
 // 同じ事実を重ねて数えないよう、上位の観点があれば下位の観点を外す。
@@ -194,6 +200,10 @@ export async function scoreWithDomains(
     if ("tld" in info && info.tld) domains.push({ registered_domain: info.registered_domain, tld: info.tld });
     if (info.random_subdomain) {
       extra.push({ id: "random_subdomain", evidence: `${info.host}（${info.random_labels.join("、")}）` });
+    }
+    // 英数字以外の文字（飾りつきのラテン文字など）を使ったドメインは、変換後に xn-- で始まる部分を持つ。
+    if (/(^|\.)xn--/i.test(info.host)) {
+      extra.push({ id: "lookalike_domain", evidence: `${original}（実際の表記: ${info.host}）` });
     }
     let registration = fromDevice.get(info.registered_domain.toLowerCase());
     let where = "端末で確認";

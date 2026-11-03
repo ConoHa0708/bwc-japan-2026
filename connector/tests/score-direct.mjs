@@ -6,7 +6,8 @@ const ALL = [
   "org_claim", "login_mismatch_verified", "domain_differs_from_main", "org_in_subdomain", "destination_unknown",
   "input_credentials", "input_card_or_account", "input_id_document", "authority_money_request", "money_transfer_request",
   "sender_mismatch_verified", "financial_credential_request", "tax_or_delivery_sms_link", "offstore_app",
-  "app_install_request", "lure_to_login", "lure_to_other_contact", "unusual_characters", "urgency",
+  "app_install_request", "lure_to_login", "lure_to_other_contact", "unusual_characters", "brand_misspelling",
+  "unnatural_japanese", "urgency",
   "sms_foreign_mobile", "sms_domestic_mobile", "dmarc_fail",
 ];
 
