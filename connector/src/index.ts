@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
+import { registerDomainApp } from "./app";
 import { PROTOCOL_TEXT, PROTOCOL_VERSION } from "./protocol";
 import { SIGNAL_IDS, scoreWithDomains } from "./scoring";
 import { expandShortUrl } from "./shorturl";
@@ -87,6 +88,7 @@ function createServer() {
       return { content: [{ type: "text", text: result.text }] };
     },
   );
+  registerDomainApp(server);
   return server;
 }
 

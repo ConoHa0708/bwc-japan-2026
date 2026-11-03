@@ -5,6 +5,7 @@
     "wrangler": "^4.156.1"
   },
   "dependencies": {
+    "@modelcontextprotocol/ext-apps": "2.1.0",
     "@modelcontextprotocol/server": "^2.4.0",
     "agents": "^0.32.0",
     "tldts": "7.0.17",
