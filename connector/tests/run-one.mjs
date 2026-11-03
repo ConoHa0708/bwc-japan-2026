@@ -36,6 +36,7 @@ const env = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(CLAUDE|ANTHROPIC_BASE_URL)/.test(key))),
   CLAUDE_CODE_DISABLE_CLAUDE_MDS: "1",
   ENABLE_TOOL_SEARCH: "false",
+  MCP_TIMEOUT: "30000",
 };
 
 function run(prompt, sessionId) {
@@ -58,7 +59,7 @@ function run(prompt, sessionId) {
     let out = "";
     child.stdout.on("data", (d) => (out += d));
     child.on("close", () => {
-      const result = { tools: [], scores: [], answer: "", sessionId: null };
+      const result = { connected: false, tools: [], scores: [], answer: "", sessionId: null };
       for (const line of out.split(/\r?\n/)) {
         let event;
         try {
@@ -72,6 +73,9 @@ function run(prompt, sessionId) {
             if (block.name.endsWith("score_observations")) result.scores.push(block.input);
           }
         }
+        if (event.type === "system" && event.subtype === "init") {
+          result.connected = (event.mcp_servers ?? []).some((m) => m.name === SERVER && m.status === "connected");
+        }
         if (event.type === "result") {
           result.answer = event.result ?? "";
           result.sessionId = event.session_id ?? null;
@@ -83,8 +87,19 @@ function run(prompt, sessionId) {
   });
 }
 
+// テスト環境ではコネクターの読み込みがときどき失敗するため、未接続ならやり直す。
+async function runConnected(prompt, sessionId) {
+  let r;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    r = await run(prompt, sessionId);
+    if (r.connected) break;
+  }
+  return r;
+}
+
 function show(title, r) {
   console.log(`===== ${title} =====`);
+  console.log(`コネクター: ${r.connected ? "接続" : "未接続"}`);
   console.log(`呼び出した道具: ${r.tools.join(", ") || "なし"}`);
   for (const s of r.scores) console.log(`送った観点: ${s.observations.map((o) => o.id).join(", ")}`);
   console.log("");
@@ -92,12 +107,12 @@ function show(title, r) {
   console.log("");
 }
 
-const first = await run(
+const first = await runConnected(
   values.image ? `この画像を共有します: ${resolve(values.image)}` : values.text,
 );
 show("診断", first);
 
 if (values.answer && first.sessionId) {
-  const second = await run(values.answer, first.sessionId);
+  const second = await runConnected(values.answer, first.sessionId);
   show(`再診断（答え: ${values.answer}）`, second);
 }

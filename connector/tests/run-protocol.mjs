@@ -43,13 +43,14 @@ const cleanEnv = {
   ),
   CLAUDE_CODE_DISABLE_CLAUDE_MDS: "1",
   ENABLE_TOOL_SEARCH: "false",
+  MCP_TIMEOUT: "30000",
 };
 
 const SYSTEM_PROMPT = `あなたは Claude です。利用者の最初のメッセージに対し、最初に必ず ${TOOL} を呼び、返された作法に従って日本語で回答してください。`;
 const systemPromptFile = join(work, "system.txt");
 writeFileSync(systemPromptFile, SYSTEM_PROMPT);
 
-function runOnce(testCase) {
+function runOnceRaw(testCase) {
   return new Promise((resolve) => {
     const args = [
       "-p",
@@ -78,6 +79,7 @@ function runOnce(testCase) {
 function parse(out) {
   const tools = [];
   let answer = "";
+  let connected = false;
   for (const line of out.split(/\r?\n/)) {
     let event;
     try {
@@ -88,10 +90,14 @@ function parse(out) {
     for (const block of event.message?.content ?? []) {
       if (block.type === "tool_use") tools.push(block.name);
     }
+    if (event.type === "system" && event.subtype === "init") {
+      connected = (event.mcp_servers ?? []).some((m) => m.name === SERVER && m.status === "connected");
+    }
     if (event.type === "result") answer = event.result ?? "";
   }
   const verdict = LEADS.find(([, lead]) => answer.includes(lead))?.[0] ?? "その他";
   return {
+    connected,
     called: tools.includes(TOOL),
     fetched: tools.includes("WebFetch"),
     versioned: /作法 v[\d.]+ で確認/.test(answer),
@@ -102,6 +108,16 @@ function parse(out) {
     tools,
     answer,
   };
+}
+
+// テスト環境ではコネクターの読み込みがときどき失敗するため、未接続ならやり直す。
+async function runOnce(testCase) {
+  let result;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    result = await runOnceRaw(testCase);
+    if (result.connected) break;
+  }
+  return result;
 }
 
 const jobs = cases.flatMap((c) => Array.from({ length: repeat }, () => c));
@@ -123,6 +139,7 @@ const rows = cases.map((c) => {
   return [
     c.name,
     c.expected.join("・"),
+    count((r) => r.connected),
     runs.map((r) => r.verdict).join(" "),
     count((r) => c.expected.includes(r.verdict)),
     count((r) => r.called),
@@ -133,7 +150,7 @@ const rows = cases.map((c) => {
     count((r) => r.unsupportedMismatch),
   ];
 });
-const header = ["件名", "期待", "判定", "一致", "呼び出し", "版表示", "取得", "平均文字数", "禁止語", "根拠なし不一致"];
+const header = ["件名", "期待", "接続", "判定", "一致", "呼び出し", "版表示", "取得", "平均文字数", "禁止語", "根拠なし不一致"];
 const table = [header, header.map(() => "---"), ...rows].map((r) => `| ${r.join(" | ")} |`).join("\n");
 console.log(table);
 
