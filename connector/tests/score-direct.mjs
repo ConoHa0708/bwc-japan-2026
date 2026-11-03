@@ -1,6 +1,6 @@
 // 採点の道具を直接呼び、配点と判定の決まりを確かめる（Claude を介さない）。
-// 使い方: node tests/score-direct.mjs
-const URL_MCP = "https://bwc-probe.taka-bwc-japan-2026.workers.dev/mcp";
+// 使い方: node tests/score-direct.mjs（手元の wrangler dev で試すときは BWC_MCP_URL=http://localhost:8788/mcp）
+const URL_MCP = process.env.BWC_MCP_URL ?? "https://bwc-probe.taka-bwc-japan-2026.workers.dev/mcp";
 
 const ALL = [
   "org_claim", "login_mismatch_verified", "domain_differs_from_main", "org_in_subdomain", "destination_unknown",
@@ -30,6 +30,40 @@ const CASES = [
     hits: ["org_claim", "sender_mismatch_verified", "lure_to_login"],
     evidence: [{ id: "sender_mismatch_verified", text: "公式と異なる" }],
   },
+  {
+    name: "英数字だけの似せた綴り（rn → m）",
+    expect: "黒",
+    hits: ["org_claim", "input_credentials"],
+    evidence: [],
+    targets: ["https://www.exarnple.com/login"],
+    official_domains: ["example.com"],
+    lookalike: true,
+  },
+  {
+    name: "公式と同じ綴りで TLD だけ違う（似せ文字ではない）",
+    expect: "白",
+    hits: ["org_claim"],
+    evidence: [],
+    targets: ["https://www.example.net/"],
+    official_domains: ["example.com"],
+    lookalike: false,
+  },
+  {
+    name: "日本語だけのドメイン（似せ文字ではない）",
+    expect: "白",
+    hits: ["org_claim"],
+    evidence: [],
+    targets: ["https://例え.jp/"],
+    lookalike: false,
+  },
+  {
+    name: "英字にキリル文字が混ざるドメイン",
+    expect: "黒",
+    hits: ["org_claim", "input_credentials"],
+    evidence: [],
+    targets: ["https://exаmple.com/"],
+    lookalike: true,
+  },
 ];
 
 for (const c of CASES) {
@@ -41,7 +75,10 @@ for (const c of CASES) {
       jsonrpc: "2.0",
       id: 1,
       method: "tools/call",
-      params: { name: "score_observations", arguments: { checklist, evidence: c.evidence } },
+      params: {
+        name: "score_observations",
+        arguments: { checklist, evidence: c.evidence, targets: c.targets, official_domains: c.official_domains },
+      },
     }),
   });
   const body = await response.text();
@@ -49,6 +86,7 @@ for (const c of CASES) {
   const text = json.result?.structuredContent?.text ?? JSON.stringify(json.result ?? json.error);
   const lines = text.split("\n").filter((l) => /^【スコア|^【判断|^・(\+|合計)/.test(l));
   const verdict = text.match(/【判断】(黒|グレー|白)/)?.[1];
-  console.log(`${verdict === c.expect ? "OK" : "NG"} ${c.name}（期待: ${c.expect}）`);
+  const lookalikeOk = c.lookalike === undefined || text.includes("見た目の似た別の文字") === c.lookalike;
+  console.log(`${verdict === c.expect && lookalikeOk ? "OK" : "NG"} ${c.name}（期待: ${c.expect}）`);
   for (const l of lines) console.log(`   ${l}`);
 }

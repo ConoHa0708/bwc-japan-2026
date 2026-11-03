@@ -1,6 +1,6 @@
 // 観測された観点を加点し、診断結果の文面を組み立てる。
 // 配点は期間中に新しく決めた仮の値。運用の配点は後で非公開の設定に移す。
-import { NEW_DOMAIN_DAYS, checkDomain } from "./domain";
+import { NEW_DOMAIN_DAYS, asciiLookalikeOf, checkDomain, nonJapaneseIdnLabels } from "./domain";
 import { expandShortUrl } from "./shorturl";
 import { PROTOCOL_VERSION } from "./protocol";
 
@@ -172,6 +172,7 @@ export async function scoreWithDomains(
   observations: Observation[],
   targets: string[],
   device: DeviceRegistration[] = [],
+  officials: string[] = [],
 ) {
   const extra: Observation[] = [];
   const domains: { registered_domain: string; tld: string }[] = [];
@@ -202,8 +203,12 @@ export async function scoreWithDomains(
       extra.push({ id: "random_subdomain", evidence: `${info.host}（${info.random_labels.join("、")}）` });
     }
     // 英数字以外の文字（飾りつきのラテン文字など）を使ったドメインは、変換後に xn-- で始まる部分を持つ。
-    if (/(^|\.)xn--/i.test(info.host)) {
+    // 日本語の文字だけのものは数えない。英数字だけの似せ方（rn → m など）は、確かめた公式ドメインと比べる。
+    const lookalikeOf = asciiLookalikeOf(info.host, officials);
+    if (nonJapaneseIdnLabels(info.host).length > 0) {
       extra.push({ id: "lookalike_domain", evidence: `${original}（実際の表記: ${info.host}）` });
+    } else if (lookalikeOf) {
+      extra.push({ id: "lookalike_domain", evidence: `${info.registered_domain}（公式の ${lookalikeOf} に似せた綴り）` });
     }
     let registration = fromDevice.get(info.registered_domain.toLowerCase());
     let where = "端末で確認";
