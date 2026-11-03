@@ -28,7 +28,7 @@ const HTML = `<!DOCTYPE html>
   pre { white-space: pre-wrap; font-family: inherit; margin: 0; }
 </style></head>
 <body>
-<div id="note" class="note">この端末からドメインの登録日を確認しています…</div>
+<div id="note" class="note"></div>
 <pre id="result"></pre>
 <script type="module">
   import { App } from "${APP_SDK}";
@@ -61,6 +61,7 @@ const HTML = `<!DOCTYPE html>
   app.ontoolresult = async (result) => {
     const sc = result?.structuredContent;
     if (!sc) return;
+    $("note").textContent = "この端末からドメインの登録日を確認しています…";
     if (sc.usedDevice || !sc.domains?.length) {
       $("note").textContent = sc.usedDevice ? "この端末で確認した登録日を使った診断です" : "";
       $("result").textContent = sc.text;
@@ -73,7 +74,7 @@ const HTML = `<!DOCTYPE html>
       return;
     }
     const again = await app.callServerTool({
-      name: "score_observations",
+      name: "phishing_check",
       arguments: { checklist: sc.checklist, evidence: sc.evidence, targets: sc.targets, device_registrations: found },
     });
     $("note").textContent = "この端末で確認した登録日で採点し直しました: " + found.map((f) => f.domain + " " + f.registration).join("、");

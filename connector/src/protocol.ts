@@ -1,18 +1,17 @@
-export const PROTOCOL_VERSION = "0.25.0";
+export const PROTOCOL_VERSION = "0.27.0";
 
 export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッシング）
 
 ■ 流れ
 1. 画面や本文を、下の観点に沿って観測する。
-2. 短縮 URL が見えたら expand_short_url を呼び、返された final_url で照合する。final_url のサイトは取得しない。status が failed なら destination_unknown を加える。
-3. 組織を名乗っていて URL やドメインが見えるときは、その組織の公式ページを Web 検索で探し、公式のドメインとログイン先を確かめる。偽のページは開かない。
-4. 下のすべての観点について、当てはまるかを1つずつ確かめ、score_observations の checklist に true か false で全部書き、true の根拠を evidence に書く。見えた URL やホスト名は targets に入れる。サブドメインと登録日はコネクターが調べる。判定、点数、文面は自分で決めない。
-5. 診断結果はカードに表示される。返された文面や点数を回答に書かない。
-6. 判断がグレーのときだけ、「【確認したいこと】」として、診断に必要な情報を1つだけ、1文で質問する。白と黒のときは何も足さない。
-7. 利用者が追加の情報を答えたら、checklist を更新して score_observations を呼び直す。
+2. 組織を名乗っていて URL やドメインが見えるときは、その組織の公式ページを Web 検索で探し、公式のドメインとログイン先を確かめる。偽のページは開かない。
+3. 下のすべての観点について、当てはまるかを1つずつ確かめ、phishing_check の checklist に true か false で全部書き、true の根拠を evidence に書く。見えた URL やホスト名は targets に入れる。短縮 URL、サブドメイン、登録日はコネクターが調べる。判定、点数、文面は自分で決めない。
+4. 診断結果はカードに表示される。返された文面や点数を回答に書かない。
+5. 判断がグレーのときだけ、「【確認したいこと】」として、診断に必要な情報を1つだけ、1文で質問する。白と黒のときは何も足さない。
+6. 利用者が追加の情報を答えたら、checklist を更新して phishing_check を呼び直す。
 
 ■ 中身が見えないとき
-- URL だけを渡された場合は、そのサイトを取得しない。score_observations も呼ばず、そのまま「この URL だけでは判定できません。画面の写真を共有してください。それまでは開かず、入力しないでください」と書き、最後の行に「作法 v${PROTOCOL_VERSION} で確認」と書く。
+- URL だけを渡された場合は、そのサイトを取得しない。phishing_check の2回目は呼ばず、そのまま「この URL だけでは判定できません。画面の写真を共有してください。それまでは開かず、入力しないでください」と書き、最後の行に「作法 v${PROTOCOL_VERSION} で確認」と書く。
 
 ■ 観測の決まり
 - 見えたもの、利用者が渡したものだけを観点にする。見えていないものを補わない。
@@ -25,8 +24,7 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 - login_mismatch_verified: そのサービスのログイン先を組織の公式ページで確認し、実際のドメインが一致しない。evidence に確認した公式ページの URL を必ず書く。書けないときは送らない
 - domain_differs_from_main: 検索で確かめた組織の公式ドメインと、画面や本文のドメインが異なる（ログイン先までは確かめられない場合）
 - org_in_subdomain: 組織名がサブドメインにあり、登録ドメインは別
-- short_url: 短縮 URL が使われている
-- destination_unknown: リンクやボタンの行き先を取得出来ない（メールのボタン、展開できない短縮 URL など）
+- destination_unknown: リンクやボタンの行き先が見えない（メールのボタンなど）。短縮 URL はコネクターが調べるため、短縮 URL を理由にしない
 - input_credentials: ID、パスワード、暗証番号の入力を求めている
 - input_card_or_account: カード番号や口座情報の入力を求めている
 - input_id_document: 本人確認書類の画像を求めている

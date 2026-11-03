@@ -13,7 +13,7 @@ import { diagnosisText } from "./diagnosis.mjs";
 
 const SERVER = "bwc";
 const URL_MCP = "https://bwc-probe.taka-bwc-japan-2026.workers.dev/mcp";
-const TOOLS = ["get_judgment_protocol", "score_observations", "expand_short_url"].map((t) => `mcp__${SERVER}__${t}`);
+const TOOLS = ["phishing_check"].map((t) => `mcp__${SERVER}__${t}`);
 
 const { values } = parseArgs({
   options: { text: { type: "string" }, image: { type: "string" }, answer: { type: "string" } },
@@ -71,7 +71,7 @@ function run(prompt, sessionId) {
         for (const block of event.message?.content ?? []) {
           if (block.type === "tool_use") {
             result.tools.push(block.name);
-            if (block.name.endsWith("score_observations")) result.scores.push(block.input);
+            if (block.name.endsWith("phishing_check") && block.input?.checklist) result.scores.push(block.input);
           }
           if (block.type === "tool_result") result.diagnosis = diagnosisText(block) || result.diagnosis;
         }

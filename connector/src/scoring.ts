@@ -1,6 +1,7 @@
 // 観測された観点を加点し、診断結果の文面を組み立てる。
 // 配点は期間中に新しく決めた仮の値。運用の配点は後で非公開の設定に移す。
 import { NEW_DOMAIN_DAYS, checkDomain } from "./domain";
+import { expandShortUrl } from "./shorturl";
 import { PROTOCOL_VERSION } from "./protocol";
 
 export const SIGNALS = {
@@ -32,8 +33,10 @@ export const SIGNALS = {
 } as const;
 
 export type SignalId = keyof typeof SIGNALS;
+// コネクターが自分で調べて加点する観点。Claude の確認表には含めない。
+const SERVER_SIGNALS = new Set<SignalId>(["random_subdomain", "new_domain", "short_url"]);
 export const SIGNAL_IDS = (Object.keys(SIGNALS) as SignalId[]).filter(
-  (id) => id !== "random_subdomain" && id !== "new_domain",
+  (id) => !SERVER_SIGNALS.has(id),
 ) as [SignalId, ...SignalId[]];
 
 const MAX_SCORE = 100;
@@ -131,7 +134,18 @@ export async function scoreWithDomains(
   const fromDevice = new Map(
     device.filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.registration)).map((r) => [r.domain.toLowerCase(), r.registration]),
   );
-  for (const target of targets.slice(0, 5)) {
+  for (const original of targets.slice(0, 5)) {
+    // 短縮 URL は短縮サービスにだけ問い合わせて行き先を読む。行き先のサイトは開かない。
+    let target = original;
+    const expanded = await expandShortUrl(/^https?:\/\//.test(original) ? original : `https://${original}`).catch(() => null);
+    if (expanded && expanded.status === "expanded") {
+      extra.push({ id: "short_url", evidence: `${original} → ${expanded.final_url}` });
+      target = expanded.final_url;
+    } else if (expanded && expanded.status === "failed" && expanded.hops > 0) {
+      extra.push({ id: "short_url", evidence: original });
+      extra.push({ id: "destination_unknown", evidence: `${original}（短縮 URL の行き先を取得出来ず）` });
+      continue;
+    }
     let info: Awaited<ReturnType<typeof checkDomain>>;
     try {
       info = await checkDomain(target, { rdap: false });
@@ -159,7 +173,7 @@ export async function scoreWithDomains(
       }
     }
   }
-  const filtered = observations.filter((o) => o.id !== "random_subdomain" && o.id !== "new_domain");
+  const filtered = observations.filter((o) => !SERVER_SIGNALS.has(o.id));
   return { ...score([...filtered, ...extra]), domains, usedDevice: fromDevice.size > 0 };
 }
 
