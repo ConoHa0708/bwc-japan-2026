@@ -74,13 +74,11 @@ function extraActions(ids: SignalId[]) {
 }
 
 export type Observation = { id: SignalId; evidence: string };
-export type Checklist = Partial<Record<SignalId, { hit: boolean; evidence?: string }>>;
+export type Checklist = Partial<Record<SignalId, boolean>>;
 
-export function observationsFrom(checklist: Checklist): Observation[] {
-  return SIGNAL_IDS.flatMap((id) => {
-    const c = checklist[id];
-    return c?.hit ? [{ id, evidence: c.evidence ?? "" }] : [];
-  });
+export function observationsFrom(checklist: Checklist, evidence: { id: string; text: string }[] = []): Observation[] {
+  const texts = new Map<string, string>(evidence.map((e) => [e.id, e.text]));
+  return SIGNAL_IDS.flatMap((id) => (checklist[id] ? [{ id, evidence: texts.get(id) ?? "" }] : []));
 }
 
 export function score(observations: Observation[]) {
@@ -165,8 +163,3 @@ export async function scoreWithDomains(
   return { ...score([...filtered, ...extra]), domains, usedDevice: fromDevice.size > 0 };
 }
 
-// 採点の道具の入力説明に使う、観点ごとの判断基準。
-export function signalRule(id: SignalId): string {
-  const signal: { label: string; rule?: string } = SIGNALS[id];
-  return signal.rule ?? signal.label;
-}

@@ -106,7 +106,7 @@ function show(title, r) {
   console.log(`呼び出した道具: ${r.tools.join(", ") || "なし"}`);
   for (const s of r.scores) {
     const items = Object.entries(s.checklist ?? {});
-    const hits = items.filter(([, c]) => c?.hit).map(([id]) => id);
+    const hits = items.filter(([, c]) => c === true).map(([id]) => id);
     console.log(`確認表: ${items.length} 項目に回答、当てはまり ${hits.join(", ") || "なし"}`);
   }
   if (r.diagnosis) console.log(`\n--- カードの診断 ---\n${r.diagnosis}`);

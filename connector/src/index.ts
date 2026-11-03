@@ -4,7 +4,7 @@ import { z } from "zod";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import { DIAGNOSIS_UI, registerDiagnosisView } from "./app";
 import { PROTOCOL_TEXT, PROTOCOL_VERSION } from "./protocol";
-import { SIGNAL_IDS, observationsFrom, scoreWithDomains, signalRule } from "./scoring";
+import { SIGNAL_IDS, observationsFrom, scoreWithDomains } from "./scoring";
 import { expandShortUrl } from "./shorturl";
 
 function createServer() {
@@ -66,23 +66,14 @@ function createServer() {
     {
       title: "観測を採点して診断",
       description:
-        "すべての観点について、当てはまるかを1つずつ確かめて checklist に書き、診断を受け取る。判定は自分で決めない。診断結果はカードに表示される。追加の情報を受け取ったら、checklist を更新して呼び直す。",
+        "作法の観点すべてを checklist で答え、診断を受け取る。診断結果はカードに表示される。",
       inputSchema: {
         checklist: z
-          .object(
-            Object.fromEntries(
-              SIGNAL_IDS.map((id) => [
-                id,
-                z
-                  .object({
-                    hit: z.boolean().describe("当てはまれば true"),
-                    evidence: z.string().optional().describe("true のとき、画面や本文に見えた根拠を原文のまま短く"),
-                  })
-                  .describe(signalRule(id)),
-              ]),
-            ) as Record<(typeof SIGNAL_IDS)[number], z.ZodObject<{ hit: z.ZodBoolean; evidence: z.ZodOptional<z.ZodString> }>>,
-          )
-          .describe("すべての観点に答える。見えない、確かめられないものは false"),
+          .object(Object.fromEntries(SIGNAL_IDS.map((id) => [id, z.boolean()])) as Record<(typeof SIGNAL_IDS)[number], z.ZodBoolean>)
+          .describe("作法の観点すべてに true か false で答える。見えない、確かめられないものは false"),
+        evidence: z
+          .array(z.object({ id: z.string(), text: z.string() }))
+          .describe("true にした観点の根拠。画面や本文の原文を短く"),
         targets: z
           .array(z.string())
           .optional()
@@ -95,8 +86,8 @@ function createServer() {
       annotations: { readOnlyHint: true, destructiveHint: false },
       _meta: { ui: { resourceUri: DIAGNOSIS_UI } },
     },
-    async ({ checklist, targets, device_registrations }) => {
-      const result = await scoreWithDomains(observationsFrom(checklist), targets ?? [], device_registrations ?? []);
+    async ({ checklist, evidence, targets, device_registrations }) => {
+      const result = await scoreWithDomains(observationsFrom(checklist, evidence), targets ?? [], device_registrations ?? []);
       // 根拠の本文は記録しない。
       console.log(
         JSON.stringify({ tool: "score_observations", total: result.total, verdict: result.verdict, ids: result.ids, device: result.usedDevice }),
@@ -109,6 +100,7 @@ function createServer() {
           usedDevice: result.usedDevice,
           domains: result.domains,
           checklist,
+          evidence,
           targets: targets ?? [],
         },
       };

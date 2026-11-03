@@ -1,11 +1,11 @@
-export const PROTOCOL_VERSION = "0.23.0";
+export const PROTOCOL_VERSION = "0.24.0";
 
 export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッシング）
 
 ■ 流れ
 1. 画面や本文を、下の観点に沿って観測する。
 2. 短縮 URL が見えたら expand_short_url を呼び、返された final_url で照合する。final_url のサイトは取得しない。status が failed なら destination_unknown を加える。
-3. 下のすべての観点について、当てはまるかを1つずつ確かめ、score_observations の checklist に全部書く。見えた URL やホスト名は targets に入れる。サブドメインと登録日はコネクターが調べる。判定、点数、文面は自分で決めない。
+3. 下のすべての観点について、当てはまるかを1つずつ確かめ、score_observations の checklist に true か false で全部書き、true の根拠を evidence に書く。見えた URL やホスト名は targets に入れる。サブドメインと登録日はコネクターが調べる。判定、点数、文面は自分で決めない。
 4. 診断結果はカードに表示される。返された文面や点数を回答に書かない。
 5. 判断がグレーのときだけ、「【確認したいこと】」として、診断に必要な情報を1つだけ、1文で質問する。白と黒のときは何も足さない。
 6. 利用者が追加の情報を答えたら、checklist を更新して score_observations を呼び直す。
