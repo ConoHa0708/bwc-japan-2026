@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
 import { PROTOCOL_TEXT, PROTOCOL_VERSION } from "./protocol";
-import { SIGNAL_IDS, score } from "./scoring";
+import { SIGNAL_IDS, scoreWithDomains } from "./scoring";
 import { expandShortUrl } from "./shorturl";
 
 function createServer() {
@@ -73,11 +73,15 @@ function createServer() {
             }),
           )
           .describe("当てはまった観点だけ。当てはまらない観点や確認できない観点は送らない"),
+        targets: z
+          .array(z.string())
+          .optional()
+          .describe("画面や本文に見えた URL やホスト名。サブドメインと登録日はコネクターが調べて加点する"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false },
     },
-    async ({ observations }) => {
-      const result = score(observations);
+    async ({ observations, targets }) => {
+      const result = await scoreWithDomains(observations, targets ?? []);
       // 根拠の本文は記録しない。
       console.log(JSON.stringify({ tool: "score_observations", total: result.total, verdict: result.verdict, ids: result.ids }));
       return { content: [{ type: "text", text: result.text }] };

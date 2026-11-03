@@ -7,6 +7,7 @@
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
     "agents": "^0.32.0",
+    "tldts": "7.0.17",
     "zod": "^4.6.7"
   },
   "name": "bwc-probe",

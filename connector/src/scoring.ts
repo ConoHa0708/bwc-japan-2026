@@ -1,5 +1,6 @@
 // 観測された観点を加点し、診断結果の文面を組み立てる。
 // 配点は期間中に新しく決めた仮の値。運用の配点は後で非公開の設定に移す。
+import { checkDomain } from "./domain";
 import { PROTOCOL_VERSION } from "./protocol";
 
 export const SIGNALS = {
@@ -7,6 +8,8 @@ export const SIGNALS = {
   login_mismatch_verified: { points: 40, label: "公式ページで確認したログイン先とドメインが一致しない" },
   domain_differs_from_main: { points: 20, label: "組織の代表ドメインと異なるドメインへ誘導している" },
   org_in_subdomain: { points: 20, label: "組織名がサブドメインにあり、登録ドメインは別" },
+  random_subdomain: { points: 20, label: "サブドメインに意味のない文字列や番号がある" },
+  new_domain: { points: 20, label: "登録ドメインの登録日が新しい" },
   short_url: { points: 15, label: "短縮 URL が使われている" },
   destination_unknown: { points: 15, label: "リンクやボタンの行き先を取得出来ず" },
   input_credentials: { points: 20, label: "ID、パスワード、暗証番号の入力を求めている" },
@@ -29,7 +32,9 @@ export const SIGNALS = {
 } as const;
 
 export type SignalId = keyof typeof SIGNALS;
-export const SIGNAL_IDS = Object.keys(SIGNALS) as [SignalId, ...SignalId[]];
+export const SIGNAL_IDS = (Object.keys(SIGNALS) as SignalId[]).filter(
+  (id) => id !== "random_subdomain" && id !== "new_domain",
+) as [SignalId, ...SignalId[]];
 
 const MAX_SCORE = 100;
 const BLACK_MIN = 60;
@@ -104,4 +109,25 @@ export function score(observations: Observation[]) {
     `作法 v${PROTOCOL_VERSION} で確認`,
   ];
   return { total, verdict, ids: details.map((d) => d.id), text: lines.join("\n") };
+}
+
+// 見えた URL やホスト名を調べ、ランダムなサブドメインと新しい登録を観点に加えてから採点する。
+export async function scoreWithDomains(observations: Observation[], targets: string[]) {
+  const extra: Observation[] = [];
+  for (const target of targets.slice(0, 5)) {
+    let info: Awaited<ReturnType<typeof checkDomain>>;
+    try {
+      info = await checkDomain(target);
+    } catch {
+      continue;
+    }
+    if (info.random_subdomain) {
+      extra.push({ id: "random_subdomain", evidence: `${info.host}（${info.random_labels.join("、")}）` });
+    }
+    if ("new_domain" in info && info.new_domain) {
+      extra.push({ id: "new_domain", evidence: `${info.registered_domain}：${info.registration} 登録（${info.age_days}日前）` });
+    }
+  }
+  const filtered = observations.filter((o) => o.id !== "random_subdomain" && o.id !== "new_domain");
+  return score([...filtered, ...extra]);
 }

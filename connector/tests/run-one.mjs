@@ -81,6 +81,7 @@ function run(prompt, sessionId) {
           result.sessionId = event.session_id ?? null;
         }
       }
+      if (result.tools.some((t) => t.startsWith(`mcp__${SERVER}__`))) result.connected = true;
       done(result);
     });
     child.stdin.end(prompt);
