@@ -79,9 +79,17 @@ function extraActions(ids: SignalId[]) {
 export type Observation = { id: SignalId; evidence: string };
 export type Checklist = Partial<Record<SignalId, boolean>>;
 
+// 公式ページで確かめたことが前提の観点。根拠に URL がなければ加点しない。
+const NEEDS_OFFICIAL_URL = new Set<SignalId>(["login_mismatch_verified", "sender_mismatch_verified"]);
+
 export function observationsFrom(checklist: Checklist, evidence: { id: string; text: string }[] = []): Observation[] {
   const texts = new Map<string, string>(evidence.map((e) => [e.id, e.text]));
-  return SIGNAL_IDS.flatMap((id) => (checklist[id] ? [{ id, evidence: texts.get(id) ?? "" }] : []));
+  return SIGNAL_IDS.flatMap((id) => {
+    if (!checklist[id]) return [];
+    const text = texts.get(id) ?? "";
+    if (NEEDS_OFFICIAL_URL.has(id) && !/https?:\/\//.test(text)) return [];
+    return [{ id, evidence: text }];
+  });
 }
 
 export function score(observations: Observation[]) {
