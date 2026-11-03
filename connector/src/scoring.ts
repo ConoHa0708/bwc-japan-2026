@@ -1,6 +1,6 @@
 // 観測された観点を加点し、診断結果の文面を組み立てる。
 // 配点は期間中に新しく決めた仮の値。運用の配点は後で非公開の設定に移す。
-import { checkDomain } from "./domain";
+import { NEW_DOMAIN_DAYS, checkDomain } from "./domain";
 import { PROTOCOL_VERSION } from "./protocol";
 
 export const SIGNALS = {
@@ -112,22 +112,47 @@ export function score(observations: Observation[]) {
 }
 
 // 見えた URL やホスト名を調べ、ランダムなサブドメインと新しい登録を観点に加えてから採点する。
-export async function scoreWithDomains(observations: Observation[], targets: string[]) {
+// 端末で取れた登録日があればそれを使い、なければサーバーから RDAP で調べる。
+export type DeviceRegistration = { domain: string; registration: string };
+
+export async function scoreWithDomains(
+  observations: Observation[],
+  targets: string[],
+  device: DeviceRegistration[] = [],
+) {
   const extra: Observation[] = [];
+  const domains: { registered_domain: string; tld: string }[] = [];
+  const fromDevice = new Map(
+    device.filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.registration)).map((r) => [r.domain.toLowerCase(), r.registration]),
+  );
   for (const target of targets.slice(0, 5)) {
     let info: Awaited<ReturnType<typeof checkDomain>>;
     try {
-      info = await checkDomain(target);
+      info = await checkDomain(target, { rdap: false });
     } catch {
       continue;
     }
+    if (info.registered_domain === "取得出来ず") continue;
+    if ("tld" in info && info.tld) domains.push({ registered_domain: info.registered_domain, tld: info.tld });
     if (info.random_subdomain) {
       extra.push({ id: "random_subdomain", evidence: `${info.host}（${info.random_labels.join("、")}）` });
     }
-    if ("new_domain" in info && info.new_domain) {
-      extra.push({ id: "new_domain", evidence: `${info.registered_domain}：${info.registration} 登録（${info.age_days}日前）` });
+    let registration = fromDevice.get(info.registered_domain.toLowerCase());
+    let where = "端末で確認";
+    if (!registration) {
+      const server = await checkDomain(target).catch(() => null);
+      if (server && "age_days" in server) {
+        registration = server.registration;
+        where = "コネクターで確認";
+      }
+    }
+    if (registration) {
+      const ageDays = Math.floor((Date.now() - Date.parse(registration)) / 86_400_000);
+      if (ageDays <= NEW_DOMAIN_DAYS) {
+        extra.push({ id: "new_domain", evidence: `${info.registered_domain}：${registration} 登録（${ageDays}日前、${where}）` });
+      }
     }
   }
   const filtered = observations.filter((o) => o.id !== "random_subdomain" && o.id !== "new_domain");
-  return score([...filtered, ...extra]);
+  return { ...score([...filtered, ...extra]), domains, usedDevice: fromDevice.size > 0 };
 }

@@ -3,7 +3,7 @@
 import { parse } from "tldts";
 
 const BOOTSTRAP_URL = "https://data.iana.org/rdap/dns.json";
-const NEW_DOMAIN_DAYS = 180;
+export const NEW_DOMAIN_DAYS = 180;
 const HEADERS = {
   "Accept-Encoding": "gzip, deflate",
   Accept: "application/rdap+json, application/json",
@@ -29,7 +29,7 @@ function randomLabels(subdomain: string): string[] {
     .filter((label) => /\d{4,}/.test(label) || /[bcdfghjklmnpqrstvwxz]{8,}/i.test(label));
 }
 
-export async function checkDomain(input: string) {
+export async function checkDomain(input: string, { rdap: useRdap = true } = {}) {
   const host = input.includes("://") ? new URL(input).hostname : input.split("/")[0];
   const parsed = parse(host, { allowPrivateDomains: true });
   const registered = parsed.domain;
@@ -43,6 +43,7 @@ export async function checkDomain(input: string) {
     random_labels: random,
   };
   if (!registered || !parsed.publicSuffix) return { ...base, registration: "取得出来ず", reason: "parse_failed" };
+  if (!useRdap) return { ...base, registration: "取得出来ず", reason: "skipped", tld: parsed.publicSuffix.split(".").pop()! };
 
   const tld = parsed.publicSuffix.split(".").pop()!;
   let rdap: string | null;

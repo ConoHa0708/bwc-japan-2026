@@ -1,14 +1,12 @@
-// 試作: 利用者の端末の上でレジストリの RDAP に問い合わせ、ドメインの登録日を表示する画面。
-// 対象のサイトには接続しない。問い合わせ先は IANA とレジストリだけ。
-import { RESOURCE_MIME_TYPE, registerAppResource, registerAppTool } from "@modelcontextprotocol/ext-apps/server";
+// 診断結果に付けるカード。利用者の端末からレジストリの RDAP に問い合わせ、
+// 取れた登録日で採点し直して表示する。対象のサイトには接続しない。
+import { RESOURCE_MIME_TYPE, registerAppResource } from "@modelcontextprotocol/ext-apps/server";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { parse } from "tldts";
-import { z } from "zod";
 
-const UI_URI = "ui://bwc/domain-check";
+export const DIAGNOSIS_UI = "ui://bwc/diagnosis";
 const APP_SDK = "https://unpkg.com/@modelcontextprotocol/ext-apps@2.1.0/dist/src/app-with-deps.js";
 
-// 画面から問い合わせてよい先。レジストリを増やすときはここに足す。
+// カードから問い合わせてよい先。レジストリを増やすときはここに足す。
 const RDAP_ORIGINS = [
   "https://data.iana.org",
   "https://rdap.verisign.com",
@@ -22,22 +20,20 @@ const RDAP_ORIGINS = [
 ];
 
 const HTML = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>ドメインの登録日</title>
+<html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>診断結果</title>
 <style>
   body { margin: 0; padding: 12px; font-family: var(--font-sans, system-ui, sans-serif); font-size: 14px;
          color: var(--color-text-primary, inherit); background: transparent; }
-  .row { padding: 8px 0; border-bottom: 0.5px solid var(--color-border-tertiary, #ccc); }
-  .host { font-weight: 600; word-break: break-all; }
-  .meta { color: var(--color-text-secondary, inherit); }
-  .new { color: var(--color-text-danger, #a33); font-weight: 600; }
+  .note { color: var(--color-text-secondary, inherit); margin-bottom: 8px; }
+  pre { white-space: pre-wrap; font-family: inherit; margin: 0; }
 </style></head>
 <body>
-<div id="title">端末からレジストリに問い合わせています…</div>
-<div id="list"></div>
+<div id="note" class="note">この端末からドメインの登録日を確認しています…</div>
+<pre id="result"></pre>
 <script type="module">
   import { App } from "${APP_SDK}";
   const $ = (id) => document.getElementById(id);
-  const app = new App({ name: "Domain registration", version: "0.1.0" });
+  const app = new App({ name: "Diagnosis", version: "0.2.0" });
   let bootstrap = null;
 
   async function rdapBase(tld) {
@@ -49,76 +45,49 @@ const HTML = `<!DOCTYPE html>
     return bootstrap.get(tld) ?? null;
   }
 
-  async function lookup(d) {
-    const base = await rdapBase(d.tld);
-    if (!base) return { ...d, registration: "取得出来ず", reason: "RDAP なし" };
+  async function registration(d) {
     try {
+      const base = await rdapBase(d.tld);
+      if (!base) return null;
       const res = await fetch(base.replace(/\\/$/, "") + "/domain/" + d.registered_domain, { headers: { Accept: "application/rdap+json" } });
-      if (!res.ok) return { ...d, registration: "取得出来ず", reason: "応答 " + res.status };
-      const data = await res.json();
-      const date = data.events?.find((e) => e.eventAction === "registration")?.eventDate;
-      if (!date) return { ...d, registration: "取得出来ず", reason: "登録日なし" };
-      const age = Math.floor((Date.now() - Date.parse(date)) / 86400000);
-      return { ...d, registration: date.slice(0, 10), age };
-    } catch (e) {
-      return { ...d, registration: "取得出来ず", reason: String(e?.message ?? e) };
+      if (!res.ok) return null;
+      const date = (await res.json()).events?.find((e) => e.eventAction === "registration")?.eventDate;
+      return date ? { domain: d.registered_domain, registration: date.slice(0, 10) } : null;
+    } catch {
+      return null;
     }
   }
 
-  async function show(result) {
-    const domains = result?.structuredContent?.domains ?? [];
-    if (!domains.length) { $("title").textContent = "調べるドメインがありません"; return; }
-    const rows = await Promise.all(domains.map(lookup));
-    $("title").textContent = "ドメインの登録日（この端末から問い合わせ）";
-    $("list").replaceChildren(...rows.map((r) => {
-      const el = document.createElement("div");
-      el.className = "row";
-      const age = r.age === undefined ? "" : "（" + r.age + "日前）";
-      el.innerHTML = '<div class="host"></div><div class="meta"></div>';
-      el.querySelector(".host").textContent = r.registered_domain;
-      const meta = el.querySelector(".meta");
-      meta.textContent = r.registration === "取得出来ず" ? "登録日: 取得出来ず（" + r.reason + "）" : "登録日: " + r.registration + age;
-      if (r.age !== undefined && r.age <= 180) meta.className = "meta new";
-      return el;
-    }));
-  }
-
-  app.ontoolresult = show;
+  app.ontoolresult = async (result) => {
+    const sc = result?.structuredContent;
+    if (!sc) return;
+    if (sc.usedDevice || !sc.domains?.length) {
+      $("note").textContent = sc.usedDevice ? "この端末で確認した登録日を使った診断です" : "";
+      $("result").textContent = sc.text;
+      return;
+    }
+    const found = (await Promise.all(sc.domains.map(registration))).filter(Boolean);
+    if (!found.length) {
+      $("note").textContent = "この端末からも登録日は取得出来ず";
+      $("result").textContent = sc.text;
+      return;
+    }
+    const again = await app.callServerTool({
+      name: "score_observations",
+      arguments: { observations: sc.observations, targets: sc.targets, device_registrations: found },
+    });
+    $("note").textContent = "この端末で確認した登録日で採点し直しました: " + found.map((f) => f.domain + " " + f.registration).join("、");
+    $("result").textContent = again?.structuredContent?.text ?? sc.text;
+  };
   await app.connect();
 </script>
 </body></html>`;
 
-export function registerDomainApp(server: McpServer) {
-  registerAppTool(
-    server,
-    "show_domain_registration",
-    {
-      title: "ドメインの登録日を端末で確認",
-      description:
-        "URL やドメインが見えたら呼ぶ。利用者の端末からレジストリに問い合わせ、登録日を画面に表示する。対象のサイトには接続しない。",
-      inputSchema: {
-        targets: z.array(z.string()).describe("画面や本文に見えた URL かホスト名"),
-      },
-      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
-      _meta: { ui: { resourceUri: UI_URI } },
-    },
-    async ({ targets }) => {
-      const domains = targets.slice(0, 5).flatMap((t) => {
-        const host = t.includes("://") ? (() => { try { return new URL(t).hostname; } catch { return t; } })() : t.split("/")[0];
-        const p = parse(host, { allowPrivateDomains: true });
-        return p.domain && p.publicSuffix ? [{ host, registered_domain: p.domain, tld: p.publicSuffix.split(".").pop()! }] : [];
-      });
-      return {
-        content: [{ type: "text", text: `端末で登録日を確認する画面を表示します: ${domains.map((d) => d.registered_domain).join(", ") || "なし"}` }],
-        structuredContent: { domains },
-      };
-    },
-  );
-
-  registerAppResource(server, "Domain registration view", UI_URI, { description: "端末からドメインの登録日を問い合わせる画面" }, async () => ({
+export function registerDiagnosisView(server: McpServer) {
+  registerAppResource(server, "Diagnosis view", DIAGNOSIS_UI, { description: "端末で登録日を確認して表示する診断結果" }, async () => ({
     contents: [
       {
-        uri: UI_URI,
+        uri: DIAGNOSIS_UI,
         mimeType: RESOURCE_MIME_TYPE,
         text: HTML,
         _meta: { ui: { csp: { resourceDomains: ["https://unpkg.com"], connectDomains: RDAP_ORIGINS } } },

@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = "0.21.0";
+export const PROTOCOL_VERSION = "0.22.0";
 
 export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッシング）
 
@@ -7,6 +7,7 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 2. 短縮 URL が見えたら expand_short_url を呼び、返された final_url で照合する。final_url のサイトは取得しない。status が failed なら destination_unknown を加える。
 3. 当てはまった観点だけを score_observations に送る。見えた URL やホスト名は targets に入れる。サブドメインと登録日はコネクターが調べる。判定、点数、文面は自分で決めない。
 4. score_observations が返した文面を、一字も変えずにそのまま示す。前後に説明、評価、助言を足さない。
+   診断カードが表示されるときは、カードが端末で登録日を確認して採点し直すことがある。その場合も文面は変えない。
 5. 判断がグレーのときだけ、その文面の後に「【確認したいこと】」として、診断に必要な情報を1つだけ、1文で質問する。白と黒のときは何も足さない。
 6. 利用者が追加の情報を答えたら、前回の観点に新しい観点を加えて score_observations を呼び直し、新しい文面を示す。
 

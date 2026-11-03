@@ -1,7 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
-import { registerDomainApp } from "./app";
+import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
+import { DIAGNOSIS_UI, registerDiagnosisView } from "./app";
 import { PROTOCOL_TEXT, PROTOCOL_VERSION } from "./protocol";
 import { SIGNAL_IDS, scoreWithDomains } from "./scoring";
 import { expandShortUrl } from "./shorturl";
@@ -59,7 +60,8 @@ function createServer() {
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
     },
   );
-  server.registerTool(
+  registerAppTool(
+    server,
     "score_observations",
     {
       title: "観測を採点して診断",
@@ -78,17 +80,33 @@ function createServer() {
           .array(z.string())
           .optional()
           .describe("画面や本文に見えた URL やホスト名。サブドメインと登録日はコネクターが調べて加点する"),
+        device_registrations: z
+          .array(z.object({ domain: z.string(), registration: z.string() }))
+          .optional()
+          .describe("診断カードが端末で確認した登録日。Claude は送らない"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false },
+      _meta: { ui: { resourceUri: DIAGNOSIS_UI } },
     },
-    async ({ observations, targets }) => {
-      const result = await scoreWithDomains(observations, targets ?? []);
+    async ({ observations, targets, device_registrations }) => {
+      const result = await scoreWithDomains(observations, targets ?? [], device_registrations ?? []);
       // 根拠の本文は記録しない。
-      console.log(JSON.stringify({ tool: "score_observations", total: result.total, verdict: result.verdict, ids: result.ids }));
-      return { content: [{ type: "text", text: result.text }] };
+      console.log(
+        JSON.stringify({ tool: "score_observations", total: result.total, verdict: result.verdict, ids: result.ids, device: result.usedDevice }),
+      );
+      return {
+        content: [{ type: "text", text: result.text }],
+        structuredContent: {
+          text: result.text,
+          usedDevice: result.usedDevice,
+          domains: result.domains,
+          observations,
+          targets: targets ?? [],
+        },
+      };
     },
   );
-  registerDomainApp(server);
+  registerDiagnosisView(server);
   return server;
 }
 
