@@ -38,7 +38,7 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 - lure_to_login: 本文や画面が、確認、ログイン、認証、検証などの操作へ誘導している（「認証を完了してください」「ご確認ください」なども含む）
 - lure_to_other_contact: 電話や LINE など別の連絡先へ誘導している
 - unusual_characters: 日本語の文の中に、日本で一般的に使わない漢字や字形（簡体字など）が混ざっている。evidence にその文字を含む原文を書く。ハングルや英語など、他の言語の文や単語が書かれているだけなら false。単なる誤字や変換ミスも false
-- brand_misspelling: 組織名やロゴの綴りが、名乗る組織の正式な名前と違う（例: Xserver を XSever と書く）。evidence に画面の綴りを原文のまま書く
+- brand_misspelling: 組織名やロゴの綴りが、名乗る組織の正式な名前と違う（例: Example を Exmaple と書く）。evidence に画面の綴りを原文のまま書く
 - unnatural_japanese: 日本語の語の使い方が明らかに不自然（例:「口座が違反しています」）。evidence に原文を書く。誤変換1つや敬語の揺れだけなら false
 - urgency: 期限、停止、制限など、急いで行動させる表現がある
 - sms_foreign_mobile: SMS の発信者が海外の携帯番号
