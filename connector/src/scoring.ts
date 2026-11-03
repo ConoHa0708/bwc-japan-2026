@@ -4,31 +4,31 @@ import { NEW_DOMAIN_DAYS, checkDomain } from "./domain";
 import { PROTOCOL_VERSION } from "./protocol";
 
 export const SIGNALS = {
-  org_claim: { points: 10, label: "実在の組織を名乗っている" },
-  login_mismatch_verified: { points: 40, label: "公式ページで確認したログイン先とドメインが一致しない" },
-  domain_differs_from_main: { points: 20, label: "組織の代表ドメインと異なるドメインへ誘導している" },
-  org_in_subdomain: { points: 20, label: "組織名がサブドメインにあり、登録ドメインは別" },
+  org_claim: { points: 10, label: "実在の組織を名乗っている", rule: "実在の組織を名乗っている" },
+  login_mismatch_verified: { points: 40, label: "公式ページで確認したログイン先とドメインが一致しない", rule: "そのサービスのログイン先を組織の公式ページで確認し、実際のドメインが一致しない。evidence に確認した公式ページの URL を必ず書く。書けないときは false" },
+  domain_differs_from_main: { points: 20, label: "組織の代表ドメインと異なるドメインへ誘導している", rule: "組織の代表ドメインと異なるドメインへ誘導している（ログイン先は未確認）" },
+  org_in_subdomain: { points: 20, label: "組織名がサブドメインにあり、登録ドメインは別", rule: "組織名がサブドメインにあり、登録ドメインは別" },
   random_subdomain: { points: 20, label: "サブドメインに意味のない文字列や番号がある" },
   new_domain: { points: 20, label: "登録ドメインの登録日が新しい" },
-  short_url: { points: 15, label: "短縮 URL が使われている" },
-  destination_unknown: { points: 15, label: "リンクやボタンの行き先を取得出来ず" },
-  input_credentials: { points: 20, label: "ID、パスワード、暗証番号の入力を求めている" },
-  input_card_or_account: { points: 20, label: "カード番号や口座情報の入力を求めている" },
-  input_id_document: { points: 20, label: "本人確認書類の画像を求めている" },
-  authority_money_request: { points: 80, label: "警察や公的機関を名乗り、振込や資金の移動を求めている" },
-  money_transfer_request: { points: 40, label: "振込や送金、指定口座への資金の移動を求めている" },
-  sender_mismatch_verified: { points: 40, label: "差出人のドメインが、公式ページで確認した組織のドメインと一致しない" },
-  financial_credential_request: { points: 50, label: "金融機関を名乗るメールか SMS で、認証情報の入力や返信を求めている" },
-  tax_or_delivery_sms_link: { points: 50, label: "国税庁か配達業者を名乗る SMS にリンクがある" },
-  offstore_app: { points: 60, label: "公式ストア以外からのアプリ導入へ誘導している" },
-  app_install_request: { points: 20, label: "アプリの導入を求めている（入手先は不明）" },
-  lure_to_login: { points: 20, label: "本文から確認やログインへ誘導している" },
-  lure_to_other_contact: { points: 20, label: "電話や LINE など別の連絡先へ誘導している" },
-  unusual_characters: { points: 15, label: "日本で一般的に使わない漢字や字形が混ざっている" },
-  urgency: { points: 15, label: "急がせる表現がある" },
-  sms_foreign_mobile: { points: 80, label: "SMS の発信者が海外の携帯番号" },
-  sms_domestic_mobile: { points: 10, label: "SMS の発信者が国内の携帯番号" },
-  dmarc_fail: { points: 30, label: "メールヘッダーの DMARC が fail" },
+  short_url: { points: 15, label: "短縮 URL が使われている", rule: "短縮 URL が使われている" },
+  destination_unknown: { points: 15, label: "リンクやボタンの行き先を取得出来ず", rule: "リンクやボタンの行き先を取得出来ない（メールのボタン、展開できない短縮 URL など）" },
+  input_credentials: { points: 20, label: "ID、パスワード、暗証番号の入力を求めている", rule: "ID、パスワード、暗証番号の入力を求めている" },
+  input_card_or_account: { points: 20, label: "カード番号や口座情報の入力を求めている", rule: "カード番号や口座情報の入力を求めている" },
+  input_id_document: { points: 20, label: "本人確認書類の画像を求めている", rule: "本人確認書類の画像を求めている" },
+  authority_money_request: { points: 80, label: "警察や公的機関を名乗り、振込や資金の移動を求めている", rule: "警察、検察、官公庁などを名乗り、振込、送金、資金の移動を求めている" },
+  money_transfer_request: { points: 40, label: "振込や送金、指定口座への資金の移動を求めている", rule: "振込、送金、指定口座への資金の移動を求めている" },
+  sender_mismatch_verified: { points: 40, label: "差出人のドメインが、公式ページで確認した組織のドメインと一致しない", rule: "差出人アドレスのドメインを、名乗る組織の公式ページで確認したドメインと照合し、一致しない。evidence に確認した公式ページの URL を必ず書く。書けないときは false" },
+  financial_credential_request: { points: 50, label: "金融機関を名乗るメールか SMS で、認証情報の入力や返信を求めている", rule: "金融機関を名乗るメールか SMS の本文そのものが、ID、パスワード、暗証番号、カード番号などの入力や返信を明記している。ログインへの誘導だけなら false にする" },
+  tax_or_delivery_sms_link: { points: 50, label: "国税庁か配達業者を名乗る SMS にリンクがある", rule: "国税庁か配達業者の名称が見える SMS に、実際のリンクが見える" },
+  offstore_app: { points: 60, label: "公式ストア以外からのアプリ導入へ誘導している", rule: "アプリの導入へ誘導するリンクの行き先が App Store や Google Play ではない" },
+  app_install_request: { points: 20, label: "アプリの導入を求めている（入手先は不明）", rule: "アプリの導入を求めているが、リンクの行き先が見えない" },
+  lure_to_login: { points: 20, label: "本文から確認やログインへ誘導している", rule: "本文から確認やログインへ誘導している" },
+  lure_to_other_contact: { points: 20, label: "電話や LINE など別の連絡先へ誘導している", rule: "電話や LINE など別の連絡先へ誘導している" },
+  unusual_characters: { points: 15, label: "日本で一般的に使わない漢字や字形が混ざっている", rule: "日本で一般的に使わない漢字や字形（簡体字など）が本文に混ざっている。evidence にその文字を含む原文を書く。単なる誤字や変換ミスはfalse にする" },
+  urgency: { points: 15, label: "急がせる表現がある", rule: "期限、停止、制限など、急いで行動させる表現がある" },
+  sms_foreign_mobile: { points: 80, label: "SMS の発信者が海外の携帯番号", rule: "SMS の発信者が海外の携帯番号" },
+  sms_domestic_mobile: { points: 10, label: "SMS の発信者が国内の携帯番号", rule: "SMS の発信者が国内の携帯番号" },
+  dmarc_fail: { points: 30, label: "メールヘッダーの DMARC が fail", rule: "メールヘッダーの DMARC が fail" },
 } as const;
 
 export type SignalId = keyof typeof SIGNALS;
@@ -74,6 +74,14 @@ function extraActions(ids: SignalId[]) {
 }
 
 export type Observation = { id: SignalId; evidence: string };
+export type Checklist = Partial<Record<SignalId, { hit: boolean; evidence?: string }>>;
+
+export function observationsFrom(checklist: Checklist): Observation[] {
+  return SIGNAL_IDS.flatMap((id) => {
+    const c = checklist[id];
+    return c?.hit ? [{ id, evidence: c.evidence ?? "" }] : [];
+  });
+}
 
 export function score(observations: Observation[]) {
   const seen = new Map<SignalId, string>();
@@ -155,4 +163,10 @@ export async function scoreWithDomains(
   }
   const filtered = observations.filter((o) => o.id !== "random_subdomain" && o.id !== "new_domain");
   return { ...score([...filtered, ...extra]), domains, usedDevice: fromDevice.size > 0 };
+}
+
+// 採点の道具の入力説明に使う、観点ごとの判断基準。
+export function signalRule(id: SignalId): string {
+  const signal: { label: string; rule?: string } = SIGNALS[id];
+  return signal.rule ?? signal.label;
 }

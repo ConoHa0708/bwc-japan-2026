@@ -4,6 +4,7 @@
 // 呼び出されるかどうかは Claude アプリの実機で確かめる。
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { diagnosisText } from "./diagnosis.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -80,6 +81,7 @@ function parse(out) {
   const tools = [];
   let answer = "";
   let connected = false;
+  let diagnosis = "";
   for (const line of out.split(/\r?\n/)) {
     let event;
     try {
@@ -89,18 +91,22 @@ function parse(out) {
     }
     for (const block of event.message?.content ?? []) {
       if (block.type === "tool_use") tools.push(block.name);
+      if (block.type === "tool_result") diagnosis = diagnosisText(block) || diagnosis;
     }
     if (event.type === "system" && event.subtype === "init") {
       connected = (event.mcp_servers ?? []).some((m) => m.name === SERVER && m.status === "connected");
     }
     if (event.type === "result") answer = event.result ?? "";
   }
-  const verdict = LEADS.find(([, lead]) => answer.includes(lead))?.[0] ?? "その他";
+  const shown = diagnosis || answer;
+  const verdict = LEADS.find(([, lead]) => shown.includes(lead))?.[0] ?? "その他";
   return {
     connected,
     called: tools.includes(TOOL),
     fetched: tools.includes("WebFetch"),
-    versioned: /作法 v[\d.]+ で確認/.test(answer),
+    versioned: /作法 v[\d.]+ で確認/.test(shown),
+    repeated: Boolean(diagnosis) && answer.includes("【スコアリング】"),
+    diagnosis,
     verdict,
     chars: answer.length,
     banned: [...new Set(answer.match(BANNED) ?? [])],
@@ -148,9 +154,10 @@ const rows = cases.map((c) => {
     Math.round(runs.reduce((a, r) => a + r.chars, 0) / runs.length),
     [...new Set(runs.flatMap((r) => r.banned))].join("、") || "-",
     count((r) => r.unsupportedMismatch),
+    count((r) => r.repeated),
   ];
 });
-const header = ["件名", "期待", "接続", "判定", "一致", "呼び出し", "版表示", "取得", "平均文字数", "禁止語", "根拠なし不一致"];
+const header = ["件名", "期待", "接続", "判定", "一致", "呼び出し", "版表示", "取得", "平均文字数", "禁止語", "根拠なし不一致", "文面の重複"];
 const table = [header, header.map(() => "---"), ...rows].map((r) => `| ${r.join(" | ")} |`).join("\n");
 console.log(table);
 

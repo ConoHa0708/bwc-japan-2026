@@ -9,6 +9,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { diagnosisText } from "./diagnosis.mjs";
 
 const SERVER = "bwc";
 const URL_MCP = "https://bwc-probe.taka-bwc-japan-2026.workers.dev/mcp";
@@ -59,7 +60,7 @@ function run(prompt, sessionId) {
     let out = "";
     child.stdout.on("data", (d) => (out += d));
     child.on("close", () => {
-      const result = { connected: false, tools: [], scores: [], answer: "", sessionId: null };
+      const result = { connected: false, tools: [], scores: [], diagnosis: "", answer: "", sessionId: null };
       for (const line of out.split(/\r?\n/)) {
         let event;
         try {
@@ -72,6 +73,7 @@ function run(prompt, sessionId) {
             result.tools.push(block.name);
             if (block.name.endsWith("score_observations")) result.scores.push(block.input);
           }
+          if (block.type === "tool_result") result.diagnosis = diagnosisText(block) || result.diagnosis;
         }
         if (event.type === "system" && event.subtype === "init") {
           result.connected = (event.mcp_servers ?? []).some((m) => m.name === SERVER && m.status === "connected");
@@ -102,8 +104,13 @@ function show(title, r) {
   console.log(`===== ${title} =====`);
   console.log(`コネクター: ${r.connected ? "接続" : "未接続"}`);
   console.log(`呼び出した道具: ${r.tools.join(", ") || "なし"}`);
-  for (const s of r.scores) console.log(`送った観点: ${s.observations.map((o) => o.id).join(", ")}`);
-  console.log("");
+  for (const s of r.scores) {
+    const items = Object.entries(s.checklist ?? {});
+    const hits = items.filter(([, c]) => c?.hit).map(([id]) => id);
+    console.log(`確認表: ${items.length} 項目に回答、当てはまり ${hits.join(", ") || "なし"}`);
+  }
+  if (r.diagnosis) console.log(`\n--- カードの診断 ---\n${r.diagnosis}`);
+  console.log("\n--- Claude の回答 ---");
   console.log(r.answer);
   console.log("");
 }

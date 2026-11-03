@@ -74,7 +74,7 @@ const HTML = `<!DOCTYPE html>
     }
     const again = await app.callServerTool({
       name: "score_observations",
-      arguments: { observations: sc.observations, targets: sc.targets, device_registrations: found },
+      arguments: { checklist: sc.checklist, targets: sc.targets, device_registrations: found },
     });
     $("note").textContent = "この端末で確認した登録日で採点し直しました: " + found.map((f) => f.domain + " " + f.registration).join("、");
     $("result").textContent = again?.structuredContent?.text ?? sc.text;
