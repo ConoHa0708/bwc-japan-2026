@@ -47,6 +47,10 @@ function createServer() {
           .array(z.string())
           .optional()
           .describe("画面や本文に見えた URL やホスト名。短縮 URL、サブドメイン、登録日はコネクターが調べる"),
+        official_domains: z
+          .array(z.string())
+          .optional()
+          .describe("組織自身の公式サイトで確かめた公式ドメイン。似せた綴りとの比較に使う"),
         device_registrations: z
           .array(z.object({ domain: z.string(), registration: z.string() }))
           .optional()
@@ -55,8 +59,13 @@ function createServer() {
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
       _meta: { ui: { resourceUri: DIAGNOSIS_UI } },
     },
-    async ({ checklist, evidence, targets, device_registrations }) => {
-      const result = await scoreWithDomains(observationsFrom(checklist, evidence), targets ?? [], device_registrations ?? []);
+    async ({ checklist, evidence, targets, official_domains, device_registrations }) => {
+      const result = await scoreWithDomains(
+        observationsFrom(checklist, evidence),
+        targets ?? [],
+        device_registrations ?? [],
+        official_domains ?? [],
+      );
       // 根拠の本文は記録しない。
       console.log(
         JSON.stringify({ tool: "score_observations", total: result.total, verdict: result.verdict, ids: result.ids, device: result.usedDevice }),
@@ -71,6 +80,7 @@ function createServer() {
           checklist,
           evidence,
           targets: targets ?? [],
+          official_domains: official_domains ?? [],
         },
       };
     },

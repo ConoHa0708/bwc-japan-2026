@@ -29,6 +29,79 @@ function randomLabels(subdomain: string): string[] {
     .filter((label) => /\d{4,}/.test(label) || /[bcdfghjklmnpqrstvwxz]{8,}/i.test(label));
 }
 
+// 見た目の似た英数字の並びを1つの形にそろえる。両方をそろえて一致すれば、似せた綴りとみなす。
+const LOOKALIKE_SEQUENCES: [RegExp, string][] = [
+  [/rn/g, "m"],
+  [/vv/g, "w"],
+  [/cl/g, "d"],
+  [/0/g, "o"],
+  [/[1i]/g, "l"],
+];
+
+function skeleton(label: string) {
+  return LOOKALIKE_SEQUENCES.reduce((s, [from, to]) => s.replace(from, to), label.toLowerCase());
+}
+
+// 登録ドメインの TLD を除いた部分が、公式ドメインと綴りは違うのに似せた形では一致するなら、その公式ドメインを返す。
+export function asciiLookalikeOf(host: string, officials: string[]): string | null {
+  const label = parse(host, { allowPrivateDomains: true }).domainWithoutSuffix?.toLowerCase();
+  if (!label) return null;
+  for (const official of officials) {
+    const parsed = parse(official.includes("://") ? official : `http://${official}`, { allowPrivateDomains: true });
+    const target = parsed.domainWithoutSuffix?.toLowerCase();
+    if (target && target !== label && skeleton(target) === skeleton(label)) return parsed.domain!;
+  }
+  return null;
+}
+
+// xn-- の表記を元の文字に戻す（RFC 3492）。
+function decodePunycode(input: string): string {
+  const base = 36, tMin = 1, tMax = 26, skew = 38, damp = 700;
+  const adapt = (delta: number, count: number, first: boolean) => {
+    delta = first ? Math.floor(delta / damp) : delta >> 1;
+    delta += Math.floor(delta / count);
+    let k = 0;
+    for (; delta > ((base - tMin) * tMax) >> 1; k += base) delta = Math.floor(delta / (base - tMin));
+    return k + Math.floor(((base - tMin + 1) * delta) / (delta + skew));
+  };
+  const cut = input.lastIndexOf("-");
+  const output = cut > 0 ? [...input.slice(0, cut)].map((c) => c.codePointAt(0)!) : [];
+  let n = 128, bias = 72, i = 0;
+  for (let pos = cut > 0 ? cut + 1 : 0; pos < input.length; ) {
+    const oldI = i;
+    for (let w = 1, k = base; ; k += base) {
+      const c = input.charCodeAt(pos++);
+      const digit = c - 48 < 10 ? c - 22 : c - 65 < 26 ? c - 65 : c - 97 < 26 ? c - 97 : base;
+      if (digit >= base) throw new Error("invalid punycode");
+      i += digit * w;
+      const t = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
+      if (digit < t) break;
+      w *= base - t;
+    }
+    bias = adapt(i - oldI, output.length + 1, oldI === 0);
+    n += Math.floor(i / (output.length + 1));
+    i %= output.length + 1;
+    output.splice(i++, 0, n);
+  }
+  return String.fromCodePoint(...output);
+}
+
+// 英数字以外の文字を使ったラベルのうち、日本語の文字だけでないものを返す。
+// 日本語だけのドメインは似せ文字として数えない（見た目で判定しない）。
+export function nonJapaneseIdnLabels(host: string): string[] {
+  return host
+    .split(".")
+    .filter((label) => /^xn--/i.test(label))
+    .map((label) => {
+      try {
+        return decodePunycode(label.slice(4).toLowerCase());
+      } catch {
+        return label;
+      }
+    })
+    .filter((label) => /[^\x00-\x7F]/.test(label) && !/^[\x00-\x7F\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}ー々]+$/u.test(label));
+}
+
 export async function checkDomain(input: string, { rdap: useRdap = true } = {}) {
   // URL として読み直し、英数字以外の文字を使ったドメインを xn-- の表記にそろえる。
   const host = new URL(input.includes("://") ? input : `http://${input}`).hostname;
