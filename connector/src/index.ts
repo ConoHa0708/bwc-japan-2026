@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
 import { PROTOCOL_TEXT, PROTOCOL_VERSION } from "./protocol";
+import { SIGNAL_IDS, score } from "./scoring";
 import { expandShortUrl } from "./shorturl";
 
 function createServer() {
@@ -55,6 +56,31 @@ function createServer() {
       const result = await expandShortUrl(url);
       console.log(JSON.stringify({ tool: "expand_short_url", status: result.status, hops: result.hops }));
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    },
+  );
+  server.registerTool(
+    "score_observations",
+    {
+      title: "観測を採点して診断",
+      description:
+        "作法に沿って観測した観点を送り、診断結果を受け取る。判定は自分で決めず、返された文面をそのまま利用者に示す。追加の情報を受け取ったら、すべての観点を送り直して再診断する。",
+      inputSchema: {
+        observations: z
+          .array(
+            z.object({
+              id: z.enum(SIGNAL_IDS).describe("当てはまった観点"),
+              evidence: z.string().describe("画面や本文に見えた根拠。原文のまま短く"),
+            }),
+          )
+          .describe("当てはまった観点だけ。当てはまらない観点や確認できない観点は送らない"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    },
+    async ({ observations }) => {
+      const result = score(observations);
+      // 根拠の本文は記録しない。
+      console.log(JSON.stringify({ tool: "score_observations", total: result.total, verdict: result.verdict, ids: result.ids }));
+      return { content: [{ type: "text", text: result.text }] };
     },
   );
   return server;

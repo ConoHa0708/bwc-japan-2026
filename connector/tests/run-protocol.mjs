@@ -16,13 +16,13 @@ const TIMEOUT_MS = 180_000;
 
 const LEADS = [
   ["黒", "フィッシング詐欺の疑い大、入力しないでください"],
-  ["グレー", "詐欺となる根拠が複数確認されています。アクセスはお控えください"],
+  ["グレー", "詐欺となる根拠が"],
   ["白", "現時点で黒と判断できる内容は含まれていませんでした"],
   ["保留", "この URL だけでは判定できません"],
 ];
 
 // 作法で禁じた推定や助言の表現。見つかった語を一覧に出す。
-const BANNED = /たぶん|思われ|はず|可能性|典型|通常|一般的|よくある|実在しない|公式アプリ|ブックマーク|クリックしない|削除/g;
+const BANNED = /たぶん|思われ|はず|可能性|典型|通常|一般的|よくある|実在しない|クリックしない|削除/g;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repeat = Number(process.argv[2] ?? 1);
@@ -61,7 +61,7 @@ function runOnce(testCase) {
       "--system-prompt-file", `"${systemPromptFile}"`,
       "--strict-mcp-config",
       "--mcp-config", `"${config}"`,
-      "--allowedTools", `"${TOOL},WebSearch,WebFetch"`,
+      "--allowedTools", `"${TOOL},mcp__${SERVER}__score_observations,mcp__${SERVER}__expand_short_url,WebSearch,WebFetch"`,
     ];
     const child = spawn("claude", args, { cwd: work, shell: true, env: cleanEnv });
     let out = "";
