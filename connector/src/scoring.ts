@@ -172,7 +172,7 @@ export function score(observations: Observation[], config: ScoringConfig = SAMPL
         ? details.length >= 2
           ? "詐欺となる根拠が複数確認されています。アクセスはお控えください"
           : "詐欺となる根拠が確認されています。アクセスはお控えください"
-        : "現時点で黒と判断できる内容は含まれていませんでした";
+        : "現時点で詐欺と判断できる内容は含まれていませんでした";
 
   const lines = [
     `【スコアリング】${total}点`,
