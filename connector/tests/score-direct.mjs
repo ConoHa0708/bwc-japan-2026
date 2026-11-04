@@ -11,6 +11,12 @@ const ALL = [
   "sms_foreign_mobile", "sms_domestic_mobile", "dmarc_fail",
 ];
 
+const LEADS = [
+  ["黒", "フィッシング詐欺の疑い大"],
+  ["グレー", "詐欺となる根拠が"],
+  ["白", "現時点で詐欺と判断できる内容は"],
+];
+
 const CASES = [
   {
     name: "弱い観点だけ（誘導、行き先不明、期限、名乗り）",
@@ -85,7 +91,8 @@ for (const c of CASES) {
   const json = JSON.parse(body.split("\n").find((l) => l.startsWith("data: ")).slice(6));
   const text = json.result?.structuredContent?.text ?? JSON.stringify(json.result ?? json.error);
   const lines = text.split("\n").filter((l) => /^【スコア|^【判断|^・(\+|合計)/.test(l));
-  const verdict = text.match(/【判断】(黒|グレー|白)/)?.[1];
+  // カードには区分を出さないため、判定文から区分を読み取る。
+  const verdict = LEADS.find(([, lead]) => text.includes(`【判断】${lead}`))?.[0];
   const lookalikeOk = c.lookalike === undefined || text.includes("見た目の似た別の文字") === c.lookalike;
   console.log(`${verdict === c.expect && lookalikeOk ? "OK" : "NG"} ${c.name}（期待: ${c.expect}）`);
   for (const l of lines) console.log(`   ${l}`);

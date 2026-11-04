@@ -172,12 +172,13 @@ export function score(observations: Observation[], config: ScoringConfig = SAMPL
         ? details.length >= 2
           ? "詐欺となる根拠が複数確認されています。アクセスはお控えください"
           : "詐欺となる根拠が確認されています。アクセスはお控えください"
-        : "現時点で黒と判断できる内容は含まれていませんでした";
+        : "現時点で詐欺と判断できる内容は含まれていませんでした";
 
   const lines = [
     `【スコアリング】${total}点`,
     "",
-    `【判断】${verdict}：${headline}`,
+    // 黒、グレー、白の区分は決めつけに見えるため、カードには出さず判定文だけを出す。
+    `【判断】${headline}`,
     "",
     "【スコアリングの詳細】",
     ...(details.length
