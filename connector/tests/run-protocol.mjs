@@ -1,5 +1,5 @@
 // 公開中のコネクターに模擬文面を渡し、呼び出しと判定を一覧にする。
-// 使い方: node tests/run-protocol.mjs [1件あたりの回数] [case id ...]
+// 使い方: node tests/run-protocol.mjs [1件あたりの回数] [case id ...]（手元の wrangler dev で試すときは BWC_MCP_URL=http://127.0.0.1:8788/mcp）
 // 道具の呼び出しを強制し、作法の判定と回答の形だけを測る。
 // 呼び出されるかどうかは Claude アプリの実機で確かめる。
 import { spawn } from "node:child_process";
@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 const SERVER = "bwc";
 const TOOL = `mcp__${SERVER}__get_judgment_protocol`;
 const SCORE_TOOL = `mcp__${SERVER}__score_observations`;
-const URL_MCP = "https://bwc-probe.taka-bwc-japan-2026.workers.dev/mcp";
+const URL_MCP = process.env.BWC_MCP_URL ?? "https://bwc-probe.taka-bwc-japan-2026.workers.dev/mcp";
 const CONCURRENCY = 3;
 const TIMEOUT_MS = 180_000;
 

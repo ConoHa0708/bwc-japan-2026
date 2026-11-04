@@ -12,7 +12,7 @@ import { parseArgs } from "node:util";
 import { diagnosisText } from "./diagnosis.mjs";
 
 const SERVER = "bwc";
-const URL_MCP = "https://bwc-probe.taka-bwc-japan-2026.workers.dev/mcp";
+const URL_MCP = process.env.BWC_MCP_URL ?? "https://bwc-probe.taka-bwc-japan-2026.workers.dev/mcp";
 const TOOLS = ["get_judgment_protocol", "score_observations"].map((t) => `mcp__${SERVER}__${t}`);
 
 const { values } = parseArgs({
