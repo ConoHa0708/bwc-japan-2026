@@ -1,11 +1,11 @@
-export const PROTOCOL_VERSION = "0.35.0";
+export const PROTOCOL_VERSION = "0.36.0";
 
 export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッシング）
 
 ■ 流れ
 1. 画面や本文を、下の観点に沿って観測する。
 2. 組織を名乗っていて URL やドメインが見えるときは、その組織自身が運営する公式サイトを Web 検索で探し、公式のドメインとログイン先を確かめる。解説サイト、まとめ記事、ブログ、Q&A サイト、ニュース記事など、組織以外が書いたページは確認元にしない。組織のドメインの上にあっても、コミュニティ、掲示板、利用者の投稿のページは確認元にしない。組織自身のサイトで確かめられなければ「照合出来ず」とする。偽のページは開かない。
-3. 下のすべての観点について、当てはまるかを1つずつ確かめ、score_observations の checklist に true か false で全部書き、true の根拠を evidence に書く。見えた URL やホスト名は、画面の綴りのまま（rn を m と読みかえない）targets に入れる。手順2で組織自身のサイトで確かめた公式ドメインは official_domains に入れる。短縮 URL、サブドメイン、似せ文字、登録日はコネクターが調べる。判定、点数、文面は自分で決めない。
+3. 下のすべての観点について、当てはまるかを1つずつ確かめ、score_observations の checklist に true か false で全部書き、true の根拠を evidence に書く。見えた URL やホスト名は、画面の綴りのまま（rn を m と読みかえない）targets に入れる。手順2で組織自身のサイトで確かめた公式ドメインは official_domains に入れる。短縮 URL の行き先、サブドメイン、似せ文字、登録日はコネクターが調べる。判定、点数、文面は自分で決めない。
 4. score_observations の question に、下の「質問の候補」から1つ選んで入れる。質問はグレーのときだけ、コネクターがカードに出す。
 5. 診断結果、質問、対処方法はカードに表示される。回答は「診断カードをご確認ください。」の1文だけにし、文面、点数、質問、対処方法、注意を書かない。
 6. 利用者が追加の情報を答えたら、checklist を更新して score_observations を呼び直す。
@@ -24,7 +24,8 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 - login_mismatch_verified: そのサービスのログイン先を組織自身の公式サイトで確認し、実際のドメインが一致しない。evidence に確認した組織自身のページの URL を必ず書く。書けないときは false
 - domain_differs_from_main: 検索で確かめた組織の公式ドメインと、リンク先やアドレスバーのドメインが異なる（ログイン先までは確かめられない場合）。差出人のアドレスには使わない。login_mismatch_verified が true なら false にする
 - org_in_subdomain: 組織名がサブドメインにあり、登録ドメインは別
-- destination_unknown: リンクやボタンの行き先が見えない（メールのボタンなど）。短縮 URL はコネクターが調べるため、短縮 URL を理由にしない
+- short_url: 短縮 URL サービスの URL が見える。evidence に URL を原文のまま書く
+- destination_unknown: リンクやボタンの行き先が見えない（メールのボタンなど）。短縮 URL の行き先はコネクターが調べるため、短縮 URL を理由にしない
 - input_credentials: ID、パスワード、暗証番号の入力欄が見える、または本文がそれらの入力を明記している。ログインへの誘導や「お忘れの場合」などの案内だけなら false。メールアドレスやドメインだけの入力欄も false
 - input_card_or_account: カード番号や口座情報の入力欄が見える、または本文がそれらの入力を明記している。「お支払い方法の更新」などの案内だけなら false
 - input_id_document: 本人確認書類の画像の提出を求める文が見える

@@ -39,7 +39,8 @@ export const SIGNALS = {
 
 export type SignalId = keyof typeof SIGNALS;
 // コネクターが自分で調べて加点する観点。Claude の確認表には含めない。
-const SERVER_SIGNALS = new Set<SignalId>(["random_subdomain", "new_domain", "short_url", "lookalike_domain"]);
+// short_url は一覧にない短縮サービスもあるため、Claude の確認表にも残し、コネクターの調べと合わせて数える。
+const SERVER_SIGNALS = new Set<SignalId>(["random_subdomain", "new_domain", "lookalike_domain"]);
 export const SIGNAL_IDS = (Object.keys(SIGNALS) as SignalId[]).filter(
   (id) => !SERVER_SIGNALS.has(id),
 ) as [SignalId, ...SignalId[]];
@@ -239,7 +240,8 @@ export async function scoreWithDomains(
     if (expanded && expanded.status === "expanded") {
       extra.push({ id: "short_url", evidence: `${original} → ${expanded.final_url}` });
       target = expanded.final_url;
-    } else if (expanded && expanded.status === "failed" && expanded.hops > 0) {
+    } else if (expanded && expanded.status === "failed" && expanded.reason !== "invalid_url") {
+      // 一覧の短縮サービスだが、最初の問い合わせから行き先を読めなかったときも短縮 URL として数える。
       extra.push({ id: "short_url", evidence: original });
       extra.push({ id: "destination_unknown", evidence: `${original}（短縮 URL の行き先を取得出来ず）` });
       continue;
@@ -280,6 +282,7 @@ export async function scoreWithDomains(
     }
   }
   const filtered = observations.filter((o) => !SERVER_SIGNALS.has(o.id));
-  return { ...score([...filtered, ...extra], config, question), domains, usedDevice: fromDevice.size > 0 };
+  // 同じ観点は先に来た根拠を使うため、行き先まで読めたコネクターの根拠を先に置く。
+  return { ...score([...extra, ...filtered], config, question), domains, usedDevice: fromDevice.size > 0 };
 }
 

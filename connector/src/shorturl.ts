@@ -1,15 +1,26 @@
 // 既知の短縮サービスにだけ問い合わせ、転送先の URL を読む。転送先のサイトは開かない。
+// 一覧にないサービスの短縮 URL は、Claude が確認表で申告し、行き先は展開しない。
 const SHORTENERS = new Set([
+  "amzn.asia",
+  "amzn.to",
   "bit.ly",
+  "bom.so",
   "buff.ly",
   "cutt.ly",
   "goo.gl",
   "is.gd",
+  "lnkd.in",
   "ow.ly",
+  "qrco.de",
   "rb.gy",
+  "rebrand.ly",
+  "s.id",
+  "shorturl.at",
   "t.co",
   "t.ly",
+  "tiny.cc",
   "tinyurl.com",
+  "v.gd",
   "x.gd",
 ]);
 const MAX_HOPS = 3;
