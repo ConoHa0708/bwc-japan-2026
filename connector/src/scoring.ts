@@ -1,5 +1,6 @@
 // 観測された観点を加点し、診断結果の文面を組み立てる。
-// 配点は期間中に新しく決めた仮の値。運用の配点は後で非公開の設定に移す。
+// ここに書いた配点としきい値は公開用の見本。公開中のコネクターは、非公開の設定 SCORING_CONFIG があればそちらで採点する。
+import { z } from "zod";
 import { NEW_DOMAIN_DAYS, asciiLookalikeOf, checkDomain, nonJapaneseIdnLabels } from "./domain";
 import { expandShortUrl } from "./shorturl";
 import { PROTOCOL_VERSION } from "./protocol";
@@ -43,8 +44,36 @@ export const SIGNAL_IDS = (Object.keys(SIGNALS) as SignalId[]).filter(
 ) as [SignalId, ...SignalId[]];
 
 const MAX_SCORE = 100;
-const BLACK_MIN = 60;
-const GRAY_MIN = 30;
+
+export type ScoringConfig = { points: Record<SignalId, number>; black_min: number; gray_min: number };
+
+// 公開用の見本。SIGNALS の配点と、黒とグレーのしきい値。
+export const SAMPLE_CONFIG: ScoringConfig = {
+  points: Object.fromEntries(Object.entries(SIGNALS).map(([id, s]) => [id, s.points])) as Record<SignalId, number>,
+  black_min: 60,
+  gray_min: 30,
+};
+
+const configSchema = z.object({
+  points: z.record(z.string(), z.number().int().min(0).max(MAX_SCORE)).optional(),
+  black_min: z.number().int().min(1).max(MAX_SCORE),
+  gray_min: z.number().int().min(1).max(MAX_SCORE),
+});
+
+// 非公開の設定（JSON）を読む。なければ、または読めなければ見本で採点する。書かれていない観点は見本の配点を使う。
+export function loadScoringConfig(raw: string | undefined): ScoringConfig {
+  if (!raw) return SAMPLE_CONFIG;
+  try {
+    const parsed = configSchema.parse(JSON.parse(raw));
+    if (parsed.gray_min >= parsed.black_min) throw new Error("gray_min must be below black_min");
+    const points = { ...SAMPLE_CONFIG.points };
+    for (const [id, p] of Object.entries(parsed.points ?? {})) if (id in points) points[id as SignalId] = p;
+    return { points, black_min: parsed.black_min, gray_min: parsed.gray_min };
+  } catch {
+    console.log(JSON.stringify({ scoring_config: "invalid, using sample" }));
+    return SAMPLE_CONFIG;
+  }
+}
 
 const ACTIONS = {
   黒: [
@@ -122,11 +151,12 @@ const SUPERSEDED_BY: Partial<Record<SignalId, SignalId>> = {
   money_transfer_request: "authority_money_request",
 };
 
-export function score(observations: Observation[]) {
+export function score(observations: Observation[], config: ScoringConfig = SAMPLE_CONFIG) {
+  const { black_min: BLACK_MIN, gray_min: GRAY_MIN } = config;
   const seen = new Map<SignalId, string>();
   for (const o of observations) if (!seen.has(o.id)) seen.set(o.id, o.evidence.trim().slice(0, 200));
   for (const [id, by] of Object.entries(SUPERSEDED_BY) as [SignalId, SignalId][]) if (seen.has(by)) seen.delete(id);
-  const details = [...seen].map(([id, evidence]) => ({ id, ...SIGNALS[id], evidence }));
+  const details = [...seen].map(([id, evidence]) => ({ id, ...SIGNALS[id], points: config.points[id], evidence }));
   details.sort((a, b) => b.points - a.points);
   const sum = Math.min(MAX_SCORE, details.reduce((acc, d) => acc + d.points, 0));
   const decisive = details.some((d) => DECISIVE.has(d.id));
@@ -173,6 +203,7 @@ export async function scoreWithDomains(
   targets: string[],
   device: DeviceRegistration[] = [],
   officials: string[] = [],
+  config: ScoringConfig = SAMPLE_CONFIG,
 ) {
   const extra: Observation[] = [];
   const domains: { registered_domain: string; tld: string }[] = [];
@@ -227,6 +258,6 @@ export async function scoreWithDomains(
     }
   }
   const filtered = observations.filter((o) => !SERVER_SIGNALS.has(o.id));
-  return { ...score([...filtered, ...extra]), domains, usedDevice: fromDevice.size > 0 };
+  return { ...score([...filtered, ...extra], config), domains, usedDevice: fromDevice.size > 0 };
 }
 
