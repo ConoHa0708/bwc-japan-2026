@@ -27,13 +27,7 @@ function createServer() {
     },
     async ({ input_kind, lure_kind }) => {
       console.log(JSON.stringify({ tool: "get_judgment_protocol", protocol_version: PROTOCOL_VERSION, input_kind, lure_kind }));
-      // 作法は Claude 向け、受け取った知らせは利用者向けと印を付ける。表示を省くかはアプリしだい。
-      return {
-        content: [
-          { type: "text", text: PROTOCOL_TEXT, annotations: { audience: ["assistant"] } },
-          { type: "text", text: `判定の作法 v${PROTOCOL_VERSION} を受け取りました。`, annotations: { audience: ["user"] } },
-        ],
-      };
+      return { content: [{ type: "text", text: PROTOCOL_TEXT }] };
     },
   );
   registerAppTool(
