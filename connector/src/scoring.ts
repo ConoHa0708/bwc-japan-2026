@@ -177,7 +177,8 @@ export function score(observations: Observation[], config: ScoringConfig = SAMPL
   const lines = [
     `【スコアリング】${total}点`,
     "",
-    `【判断】${verdict}：${headline}`,
+    // 黒、グレー、白の区分は決めつけに見えるため、カードには出さず判定文だけを出す。
+    `【判断】${headline}`,
     "",
     "【スコアリングの詳細】",
     ...(details.length
