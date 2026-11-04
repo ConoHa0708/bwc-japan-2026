@@ -101,6 +101,7 @@ const EXTRA_ACTIONS: Partial<Record<SignalId, string>> = {
   money_transfer_request: "振り込みや送金はしないでください。",
   lure_to_other_contact: "表示された電話番号や連絡先には連絡しないでください。",
   group_invite_request: "グループの作成や、QR コードや招待リンクの送付はしないでください。",
+  destination_unknown: "行き先を確かめられないリンクは開かないでください。",
   offstore_app: "アプリは入れないでください。",
   app_install_request: "アプリは入れないでください。",
 };
@@ -282,6 +283,11 @@ export async function scoreWithDomains(
     }
   }
   const filtered = observations.filter((o) => !SERVER_SIGNALS.has(o.id));
+  // Claude が短縮 URL と申告したのに、一覧の短縮サービスとして調べられなかったものは、行き先を開かずに不明として数える。
+  const reported = filtered.find((o) => o.id === "short_url");
+  if (reported && !extra.some((o) => o.id === "short_url")) {
+    extra.push({ id: "destination_unknown", evidence: `${reported.evidence}（一覧にない短縮サービスのため、行き先を確かめていません）` });
+  }
   // 同じ観点は先に来た根拠を使うため、行き先まで読めたコネクターの根拠を先に置く。
   return { ...score([...extra, ...filtered], config, question), domains, usedDevice: fromDevice.size > 0 };
 }
