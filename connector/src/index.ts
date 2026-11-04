@@ -4,9 +4,9 @@ import { z } from "zod";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import { DIAGNOSIS_UI, registerDiagnosisView } from "./app";
 import { PROTOCOL_TEXT, PROTOCOL_VERSION } from "./protocol";
-import { SIGNAL_IDS, observationsFrom, scoreWithDomains } from "./scoring";
+import { SIGNAL_IDS, type ScoringConfig, loadScoringConfig, observationsFrom, scoreWithDomains } from "./scoring";
 
-function createServer() {
+function createServer(config: ScoringConfig) {
   const server = new McpServer({ name: "bwc-probe", version: PROTOCOL_VERSION });
   // 作法の取得は、アプリが最初に見つけやすいよう画面なしの道具のままにする。
   server.registerTool(
@@ -65,6 +65,7 @@ function createServer() {
         targets ?? [],
         device_registrations ?? [],
         official_domains ?? [],
+        config,
       );
       // 根拠の本文は記録しない。
       console.log(
@@ -89,8 +90,12 @@ function createServer() {
   return server;
 }
 
+// SCORING_CONFIG は運用の配点としきい値（JSON）。Cloudflare の Secret に置き、リポジトリには入れない。
+type Env = { SCORING_CONFIG?: string };
+
 export default {
   fetch(request, env, ctx) {
-    return createMcpHandler(createServer)(request, env, ctx);
+    const config = loadScoringConfig(env.SCORING_CONFIG);
+    return createMcpHandler(() => createServer(config))(request, env, ctx);
   },
-} satisfies ExportedHandler;
+} satisfies ExportedHandler<Env>;
