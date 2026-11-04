@@ -72,10 +72,11 @@ function createServer(config: ScoringConfig) {
         JSON.stringify({ tool: "score_observations", total: result.total, verdict: result.verdict, ids: result.ids, device: result.usedDevice }),
       );
       // 区分だけでは質問の決まりが守られなかったため、この結果で質問するかを返事に書く。
+      // 対処方法はカードにあるため、回答に助言を足させない。
       const next =
         result.verdict === "グレー"
-          ? "グレーなので、作法の質問の決まりに沿って「【確認したいこと】」を1つだけ、1文で質問する。"
-          : `${result.verdict}なので、質問も助言も足さない。`;
+          ? "グレーなので、回答は「【確認したいこと】」で始まる質問1文だけにする。質問は作法の質問の決まりに沿う。対処方法や注意は書かない。"
+          : `${result.verdict}なので、回答は「診断カードをご確認ください。」の1文だけにする。質問、対処方法、注意は書かない。`;
       return {
         // 診断結果はカードに出すため、Claude には文面を繰り返させない。
         content: [{ type: "text", text: `診断結果はカードに表示しました（${result.verdict}、${result.total}点）。文面は繰り返さない。${next}` }],
