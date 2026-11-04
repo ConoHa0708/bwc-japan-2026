@@ -26,6 +26,7 @@ export const SIGNALS = {
   app_install_request: { points: 20, label: "アプリの導入を求めている（入手先は不明）", rule: "アプリの導入を求めているが、リンクの行き先が見えない" },
   lure_to_login: { points: 20, label: "本文から確認やログインへ誘導している", rule: "本文から確認やログインへ誘導している" },
   lure_to_other_contact: { points: 20, label: "電話や LINE など別の連絡先へ誘導している", rule: "電話や LINE など別の連絡先へ誘導している" },
+  group_invite_request: { points: 60, label: "LINE などのグループ作成や、招待用の QR コードやリンクの送付を求めている", rule: "メールや SMS で、LINE などのグループの作成や、招待用の QR コードやリンクの送付を求めている" },
   unusual_characters: { points: 15, label: "日本で一般的に使わない漢字や字形が混ざっている", rule: "日本で一般的に使わない漢字や字形（簡体字など）が本文に混ざっている。evidence にその文字を含む原文を書く。単なる誤字や変換ミスはfalse にする" },
   brand_misspelling: { points: 20, label: "組織名やロゴの綴りが正式な名前と違う" },
   unnatural_japanese: { points: 15, label: "日本語の語の使い方が不自然" },
@@ -38,7 +39,8 @@ export const SIGNALS = {
 
 export type SignalId = keyof typeof SIGNALS;
 // コネクターが自分で調べて加点する観点。Claude の確認表には含めない。
-const SERVER_SIGNALS = new Set<SignalId>(["random_subdomain", "new_domain", "short_url", "lookalike_domain"]);
+// short_url は一覧にない短縮サービスもあるため、Claude の確認表にも残し、コネクターの調べと合わせて数える。
+const SERVER_SIGNALS = new Set<SignalId>(["random_subdomain", "new_domain", "lookalike_domain"]);
 export const SIGNAL_IDS = (Object.keys(SIGNALS) as SignalId[]).filter(
   (id) => !SERVER_SIGNALS.has(id),
 ) as [SignalId, ...SignalId[]];
@@ -85,7 +87,7 @@ const ACTIONS = {
   グレー: [
     "リンクやボタンは開かず、何も入力しないでください。",
     "確認は、公式アプリか普段お使いのブックマークから行ってください。",
-    "下の質問にお答えいただければ、もう一度診断します。",
+    "【確認したいこと】にお答えいただければ、もう一度診断します。",
   ],
   白: [
     "安全を保証するものではありません。",
@@ -98,6 +100,8 @@ const EXTRA_ACTIONS: Partial<Record<SignalId, string>> = {
   authority_money_request: "振り込まないでください。警察が現金の振り込みを求めることはありません（警視庁）。",
   money_transfer_request: "振り込みや送金はしないでください。",
   lure_to_other_contact: "表示された電話番号や連絡先には連絡しないでください。",
+  group_invite_request: "グループの作成や、QR コードや招待リンクの送付はしないでください。",
+  destination_unknown: "行き先を確かめられないリンクは開かないでください。",
   offstore_app: "アプリは入れないでください。",
   app_install_request: "アプリは入れないでください。",
 };
@@ -107,6 +111,20 @@ function extraActions(ids: SignalId[]) {
   const skip = ids.includes("authority_money_request") ? new Set<SignalId>(["money_transfer_request"]) : new Set<SignalId>();
   return [...new Set(ids.filter((id) => !skip.has(id)).map((id) => EXTRA_ACTIONS[id]).filter((a): a is string => Boolean(a)))];
 }
+
+// グレーのときにカードへ出す質問。Claude は作法の候補から id を選ぶだけで、文はここで決める。
+export const QUESTIONS = {
+  sender_address: "差出人の名前を押すと表示されるメールアドレスを教えてください。",
+  recipient: "メールの宛先（To）が、ご自身のメールアドレスかどうかを教えてください。",
+  sms_sender: "SMS の送信元に表示されている電話番号か名前を教えてください。",
+  address_bar: "画面の上のアドレス（URL）が写るように、もう一度写真を共有してください。",
+  screen_rest: "画面の続き（下の部分）も写真で共有してください。",
+  route: "このメッセージがどこから届いたか（メール、SMS、LINE など）を教えてください。",
+} as const;
+export type QuestionId = keyof typeof QUESTIONS;
+export const QUESTION_IDS = Object.keys(QUESTIONS) as [QuestionId, ...QuestionId[]];
+// 選ばれていないときに聞く質問。
+const DEFAULT_QUESTION: QuestionId = "route";
 
 export type Observation = { id: SignalId; evidence: string };
 export type Checklist = Partial<Record<SignalId, boolean>>;
@@ -137,6 +155,7 @@ const DECISIVE = new Set<SignalId>([
   "financial_credential_request",
   "tax_or_delivery_sms_link",
   "offstore_app",
+  "group_invite_request",
   "sms_foreign_mobile",
   "dmarc_fail",
   "brand_misspelling",
@@ -147,11 +166,12 @@ const DECISIVE = new Set<SignalId>([
 // 同じ事実を重ねて数えないよう、上位の観点があれば下位の観点を外す。
 const SUPERSEDED_BY: Partial<Record<SignalId, SignalId>> = {
   domain_differs_from_main: "login_mismatch_verified",
+  lure_to_other_contact: "group_invite_request",
   app_install_request: "offstore_app",
   money_transfer_request: "authority_money_request",
 };
 
-export function score(observations: Observation[], config: ScoringConfig = SAMPLE_CONFIG) {
+export function score(observations: Observation[], config: ScoringConfig = SAMPLE_CONFIG, question?: QuestionId) {
   const { black_min: BLACK_MIN, gray_min: GRAY_MIN } = config;
   const seen = new Map<SignalId, string>();
   for (const o of observations) if (!seen.has(o.id)) seen.set(o.id, o.evidence.trim().slice(0, 200));
@@ -186,6 +206,8 @@ export function score(observations: Observation[], config: ScoringConfig = SAMPL
       : ["・加点なし"]),
     ...(capped ? [`・合計は${sum}点ですが、偽物であることを示す根拠が見えないため、${BLACK_MIN - 1}点で止めています`] : []),
     "",
+    // 質問は Claude の回答に任せると出たり出なかったりしたため、グレーのときはカードに必ず出す。
+    ...(verdict === "グレー" ? ["【確認したいこと】", QUESTIONS[question ?? DEFAULT_QUESTION], ""] : []),
     "【対処方法】",
     ...(verdict === "白" ? [] : extraActions(details.map((d) => d.id)).map((a) => `・${a}`)),
     ...ACTIONS[verdict].map((a) => `・${a}`),
@@ -205,6 +227,7 @@ export async function scoreWithDomains(
   device: DeviceRegistration[] = [],
   officials: string[] = [],
   config: ScoringConfig = SAMPLE_CONFIG,
+  question?: QuestionId,
 ) {
   const extra: Observation[] = [];
   const domains: { registered_domain: string; tld: string }[] = [];
@@ -218,7 +241,8 @@ export async function scoreWithDomains(
     if (expanded && expanded.status === "expanded") {
       extra.push({ id: "short_url", evidence: `${original} → ${expanded.final_url}` });
       target = expanded.final_url;
-    } else if (expanded && expanded.status === "failed" && expanded.hops > 0) {
+    } else if (expanded && expanded.status === "failed" && expanded.reason !== "invalid_url") {
+      // 一覧の短縮サービスだが、最初の問い合わせから行き先を読めなかったときも短縮 URL として数える。
       extra.push({ id: "short_url", evidence: original });
       extra.push({ id: "destination_unknown", evidence: `${original}（短縮 URL の行き先を取得出来ず）` });
       continue;
@@ -259,6 +283,12 @@ export async function scoreWithDomains(
     }
   }
   const filtered = observations.filter((o) => !SERVER_SIGNALS.has(o.id));
-  return { ...score([...filtered, ...extra], config), domains, usedDevice: fromDevice.size > 0 };
+  // Claude が短縮 URL と申告したのに、一覧の短縮サービスとして調べられなかったものは、行き先を開かずに不明として数える。
+  const reported = filtered.find((o) => o.id === "short_url");
+  if (reported && !extra.some((o) => o.id === "short_url")) {
+    extra.push({ id: "destination_unknown", evidence: `${reported.evidence}（一覧にない短縮サービスのため、行き先を確かめていません）` });
+  }
+  // 同じ観点は先に来た根拠を使うため、行き先まで読めたコネクターの根拠を先に置く。
+  return { ...score([...extra, ...filtered], config, question), domains, usedDevice: fromDevice.size > 0 };
 }
 

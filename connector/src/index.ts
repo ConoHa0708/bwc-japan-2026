@@ -4,7 +4,7 @@ import { z } from "zod";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import { DIAGNOSIS_UI, registerDiagnosisView } from "./app";
 import { PROTOCOL_TEXT, PROTOCOL_VERSION } from "./protocol";
-import { SIGNAL_IDS, type ScoringConfig, loadScoringConfig, observationsFrom, scoreWithDomains } from "./scoring";
+import { QUESTION_IDS, SIGNAL_IDS, type ScoringConfig, loadScoringConfig, observationsFrom, scoreWithDomains } from "./scoring";
 
 function createServer(config: ScoringConfig) {
   const server = new McpServer({ name: "bwc-probe", version: PROTOCOL_VERSION });
@@ -51,6 +51,10 @@ function createServer(config: ScoringConfig) {
           .array(z.string())
           .optional()
           .describe("組織自身の公式サイトで確かめた公式ドメイン。似せた綴りとの比較に使う"),
+        question: z
+          .enum(QUESTION_IDS)
+          .optional()
+          .describe("作法の質問の候補から1つ。グレーのときだけカードに出る"),
         device_registrations: z
           .array(z.object({ domain: z.string(), registration: z.string() }))
           .optional()
@@ -59,21 +63,27 @@ function createServer(config: ScoringConfig) {
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
       _meta: { ui: { resourceUri: DIAGNOSIS_UI } },
     },
-    async ({ checklist, evidence, targets, official_domains, device_registrations }) => {
+    async ({ checklist, evidence, targets, official_domains, question, device_registrations }) => {
       const result = await scoreWithDomains(
         observationsFrom(checklist, evidence),
         targets ?? [],
         device_registrations ?? [],
         official_domains ?? [],
         config,
+        question,
       );
       // 根拠の本文は記録しない。
       console.log(
         JSON.stringify({ tool: "score_observations", total: result.total, verdict: result.verdict, ids: result.ids, device: result.usedDevice }),
       );
       return {
-        // 診断結果はカードに出すため、Claude には文面を繰り返させない。
-        content: [{ type: "text", text: `診断結果はカードに表示しました（${result.verdict}、${result.total}点）。文面は繰り返さない。` }],
+        // 診断結果、質問、対処方法はカードに出すため、Claude の回答には何も足させない。
+        content: [
+          {
+            type: "text",
+            text: `診断結果はカードに表示しました（${result.verdict}、${result.total}点）。回答は「診断カードをご確認ください。」の1文だけにする。文面、質問、対処方法、注意は書かない。`,
+          },
+        ],
         structuredContent: {
           text: result.text,
           usedDevice: result.usedDevice,
@@ -82,6 +92,7 @@ function createServer(config: ScoringConfig) {
           evidence,
           targets: targets ?? [],
           official_domains: official_domains ?? [],
+          question,
         },
       };
     },

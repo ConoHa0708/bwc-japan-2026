@@ -102,5 +102,75 @@
       "黒"
     ],
     "text": "差出人: 刑 事 部 <xxxxxxxx@sender-sample.example>\n\n警察厅：銀行口座がマネーロンダリングに関与している疑いがあります。24時間以内に 銀行口座の資金を全額凍結いたします。口座内の資金を警察署が提供する安全な口座に振り替えることができます。このメールを受け取ってから24時間以内に振込手続きをしてください。\n\nサンプル銀行 サンプル支店 普通 0000000"
+  },
+  {
+    "id": "lookalike-rn-real",
+    "name": "実在の組織に rn で似せたドメイン（予約 TLD）",
+    "expected": [
+      "黒"
+    ],
+    "lookalike": true,
+    "text": "Amazon <account-update@arnazon.example>\nお客様のアカウントで異常なサインインを検出したため、ご利用を一時的に制限しました。48時間以内に下記からサインインし、お支払い情報をご確認ください。\nhttps://www.arnazon.example/ap/signin"
+  },
+  {
+    "id": "lookalike-rn-fictional",
+    "name": "架空の組織に rn で似せたドメイン",
+    "expected": [
+      "グレー",
+      "黒"
+    ],
+    "lookalike": false,
+    "text": "Sample Securities <info@sarnple-securities.example>\nお客様の登録情報の確認期限が近づいています。下記からログインし、登録情報をご確認ください。\nhttps://www.sarnple-securities.example/login"
+  },
+  {
+    "id": "japanese-domain",
+    "name": "日本語だけのドメイン",
+    "expected": [
+      "グレー"
+    ],
+    "lookalike": false,
+    "text": "サンプル銀行\n【重要】お客さま情報の確認のお願い。下記からログインしてご確認ください。\nhttps://サンプル銀行.example/login"
+  },
+  {
+    "id": "cyrillic-mixed",
+    "name": "英字にキリル文字が混ざるドメイン",
+    "expected": [
+      "黒"
+    ],
+    "lookalike": true,
+    "text": "Sample Bank <notice@sample-bank.example>\nお客様の口座のセキュリティ設定を更新しました。下記からログインして設定をご確認ください。\nhttps://www.sаmple-bank.example/login"
+  },
+  {
+    "id": "sender-hidden",
+    "name": "差出人の名前だけが見えるメール",
+    "expected": [
+      "グレー"
+    ],
+    "text": "件名: ご契約内容の確認のお願い\n差出人: サンプルガス お客さまセンター\nご契約内容の更新のため、会員ページへのログインをお願いいたします。\nhttps://member.sample-gas.example/"
+  },
+  {
+    "id": "line-group-qr",
+    "name": "LINE グループの作成と QR の送付を求めるメール（架空化）",
+    "expected": [
+      "黒"
+    ],
+    "text": "サンプル商事 <sample-staff@freemail.example>\n件名: 業務調整に関するご案内\n\n業務上の都合により、新しく LINE グループを作成いただきたく存じます。\n【作成時のお願い】\n・他の方は招待せず、作成のみで結構です\n作成が完了しましたら、LINE グループの QR コードを本メール宛にご送付いただけますと幸いです。\nこちらからグループに参加のうえ、速やかに業務調整を進めさせていただきます。\n\n山田 太郎\nサンプル商事"
+  },
+  {
+    "id": "short-url-unlisted",
+    "name": "一覧にない短縮サービスの URL",
+    "expected": [
+      "グレー",
+      "黒"
+    ],
+    "text": "サンプル電力 料金のお知らせ <info@sample-denryoku.example>\n今月のご請求額が確定しました。詳細は下記からご確認ください。\nhttps://clck.ru/sample-0000"
+  },
+  {
+    "id": "short-path-normal",
+    "name": "短縮 URL ではない短い URL",
+    "expected": [
+      "白"
+    ],
+    "text": "サンプル通販 <info@shop-sample.example>\nご注文ありがとうございました。ご注文の内容は下記でご覧いただけます。このメールへの返信は不要です。\nhttps://shop-sample.example/o/1234"
   }
 ]
