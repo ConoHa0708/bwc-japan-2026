@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 
 const SERVER = "bwc";
 const TOOL = `mcp__${SERVER}__get_judgment_protocol`;
+const SCORE_TOOL = `mcp__${SERVER}__score_observations`;
 const URL_MCP = "https://bwc-probe.taka-bwc-japan-2026.workers.dev/mcp";
 const CONCURRENCY = 3;
 const TIMEOUT_MS = 180_000;
@@ -24,6 +25,9 @@ const LEADS = [
 
 // 作法で禁じた推定や助言の表現。見つかった語を一覧に出す。
 const BANNED = /たぶん|思われ|はず|可能性|典型|通常|一般的|よくある|実在しない|クリックしない|削除/g;
+
+// 診断カードに似せ文字の加点が出たかを、観点の表示名で見分ける。
+const LOOKALIKE_LABEL = "見た目の似た別の文字";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repeat = Number(process.argv[2] ?? 1);
@@ -63,7 +67,7 @@ function runOnceRaw(testCase) {
       "--system-prompt-file", `"${systemPromptFile}"`,
       "--strict-mcp-config",
       "--mcp-config", `"${config}"`,
-      "--allowedTools", `"${TOOL},mcp__${SERVER}__score_observations,WebSearch,WebFetch"`,
+      "--allowedTools", `"${TOOL},${SCORE_TOOL},WebSearch,WebFetch"`,
     ];
     const child = spawn("claude", args, { cwd: work, shell: true, env: cleanEnv });
     let out = "";
@@ -82,6 +86,7 @@ function parse(out) {
   let answer = "";
   let connected = false;
   let diagnosis = "";
+  const scored = [];
   for (const line of out.split(/\r?\n/)) {
     let event;
     try {
@@ -91,6 +96,7 @@ function parse(out) {
     }
     for (const block of event.message?.content ?? []) {
       if (block.type === "tool_use") tools.push(block.name);
+      if (block.type === "tool_use" && block.name === SCORE_TOOL) scored.push(block.input ?? {});
       if (block.type === "tool_result") diagnosis = diagnosisText(block) || diagnosis;
     }
     if (event.type === "system" && event.subtype === "init") {
@@ -100,10 +106,19 @@ function parse(out) {
   }
   const shown = diagnosis || answer;
   const verdict = LEADS.find(([, lead]) => shown.includes(lead))?.[0] ?? "その他";
+  const asked = answer.includes("【確認したいこと】");
   return {
     connected,
     called: tools.includes(TOOL),
     fetched: tools.includes("WebFetch"),
+    searched: tools.includes("WebSearch"),
+    // 採点の道具へ送られた公式ドメインと見えた URL。最後の呼び出しの値を残す。
+    officialDomains: scored.at(-1)?.official_domains ?? [],
+    targets: scored.at(-1)?.targets ?? [],
+    lookalike: diagnosis.includes(LOOKALIKE_LABEL),
+    asked,
+    // 質問はグレーのときだけ。白と黒で質問した、またはグレーで質問しなかったら外れ。
+    questionOk: asked === (verdict === "グレー"),
     versioned: /作法 v[\d.]+ で確認/.test(shown),
     repeated: Boolean(diagnosis) && answer.includes("【スコアリング】"),
     diagnosis,
@@ -155,9 +170,13 @@ const rows = cases.map((c) => {
     [...new Set(runs.flatMap((r) => r.banned))].join("、") || "-",
     count((r) => r.unsupportedMismatch),
     count((r) => r.repeated),
+    count((r) => r.questionOk),
+    c.lookalike === undefined ? "-" : count((r) => r.lookalike === c.lookalike),
+    count((r) => r.searched),
+    count((r) => r.officialDomains.length > 0),
   ];
 });
-const header = ["件名", "期待", "接続", "判定", "一致", "呼び出し", "版表示", "取得", "平均文字数", "禁止語", "根拠なし不一致", "文面の重複"];
+const header = ["件名", "期待", "接続", "判定", "一致", "呼び出し", "版表示", "取得", "平均文字数", "禁止語", "根拠なし不一致", "文面の重複", "質問の決まり", "似せ文字", "Web検索", "公式ドメイン送信"];
 const table = [header, header.map(() => "---"), ...rows].map((r) => `| ${r.join(" | ")} |`).join("\n");
 console.log(table);
 
