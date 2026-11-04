@@ -106,7 +106,9 @@ function parse(out) {
   }
   const shown = diagnosis || answer;
   const verdict = LEADS.find(([, lead]) => shown.includes(lead))?.[0] ?? "その他";
-  const asked = answer.includes("【確認したいこと】");
+  // 質問はカードに出る。Claude の回答に質問が書かれたかも別に見る。
+  const asked = diagnosis.includes("【確認したいこと】");
+  const answerAsked = answer.includes("【確認したいこと】");
   return {
     connected,
     called: tools.includes(TOOL),
@@ -116,9 +118,11 @@ function parse(out) {
     officialDomains: scored.at(-1)?.official_domains ?? [],
     targets: scored.at(-1)?.targets ?? [],
     lookalike: diagnosis.includes(LOOKALIKE_LABEL),
+    question: scored.at(-1)?.question ?? null,
     asked,
-    // 質問はグレーのときだけ。白と黒で質問した、またはグレーで質問しなかったら外れ。
-    questionOk: asked === (verdict === "グレー"),
+    answerAsked,
+    // 質問はグレーのときだけカードに出る。回答に質問を書いたら外れ。
+    questionOk: asked === (verdict === "グレー") && !answerAsked,
     versioned: /作法 v[\d.]+ で確認/.test(shown),
     repeated: Boolean(diagnosis) && answer.includes("【スコアリング】"),
     diagnosis,
