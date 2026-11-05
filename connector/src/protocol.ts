@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = "0.38.0";
+export const PROTOCOL_VERSION = "0.39.0";
 
 export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッシング）
 
@@ -57,7 +57,6 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 - sms_sender: SMS で、送信元の番号や名前が見えない
 - address_bar: ウェブの画面で、アドレスバーの URL が見えない
 - screen_rest: 画面が途中で切れている
-- link_url: checklist の destination_unknown を true にした（リンクやボタンの URL そのものが見えない）
 - recipient: メールで、宛先が見えない
 - route: 上のどれにも当てはまらない
 `;
