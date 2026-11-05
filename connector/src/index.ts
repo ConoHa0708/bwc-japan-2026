@@ -51,6 +51,10 @@ function createServer(config: ScoringConfig) {
           .array(z.string())
           .optional()
           .describe("組織自身の公式サイトで確かめた公式ドメイン。似せた綴りとの比較に使う"),
+        shared_url: z
+          .string()
+          .optional()
+          .describe("利用者が本文や画面なしに URL だけを共有したときの、その URL。コネクターが URL の種類を見分ける"),
         question: z
           .enum(QUESTION_IDS)
           .optional()
@@ -63,7 +67,7 @@ function createServer(config: ScoringConfig) {
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
       _meta: { ui: { resourceUri: DIAGNOSIS_UI } },
     },
-    async ({ checklist, evidence, targets, official_domains, question, device_registrations }) => {
+    async ({ checklist, evidence, targets, official_domains, shared_url, question, device_registrations }) => {
       const result = await scoreWithDomains(
         observationsFrom(checklist, evidence),
         targets ?? [],
@@ -71,6 +75,7 @@ function createServer(config: ScoringConfig) {
         official_domains ?? [],
         config,
         question,
+        shared_url,
       );
       // 根拠の本文は記録しない。
       console.log(
@@ -92,6 +97,7 @@ function createServer(config: ScoringConfig) {
           evidence,
           targets: targets ?? [],
           official_domains: official_domains ?? [],
+          shared_url,
           question,
         },
       };

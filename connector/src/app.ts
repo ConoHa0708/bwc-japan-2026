@@ -80,6 +80,7 @@ const HTML = `<!DOCTYPE html>
         evidence: sc.evidence,
         targets: sc.targets,
         official_domains: sc.official_domains,
+        shared_url: sc.shared_url,
         question: sc.question,
         device_registrations: found,
       },
