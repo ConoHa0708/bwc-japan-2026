@@ -119,7 +119,6 @@ export const QUESTIONS = {
   sms_sender: "SMS の送信元に表示されている電話番号か名前を教えてください。",
   address_bar: "画面の上のアドレス（URL）が写るように、もう一度写真を共有してください。",
   screen_rest: "画面の続き（下の部分）も写真で共有してください。",
-  link_url: "リンクやボタンは開かずに、長押し（パソコンではマウスを重ねる）で表示される URL を教えてください。",
   route: "このメッセージがどこから届いたか（メール、SMS、LINE など）を教えてください。",
 } as const;
 export type QuestionId = keyof typeof QUESTIONS;
