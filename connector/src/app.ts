@@ -63,13 +63,13 @@ const HTML = `<!DOCTYPE html>
     if (!sc) return;
     $("note").textContent = "この端末からドメインの登録日を確認しています…";
     if (sc.usedDevice || !sc.domains?.length) {
-      $("note").textContent = sc.usedDevice ? "この端末で確認した登録日を使った診断です" : "";
+      $("note").textContent = sc.usedDevice ? "この端末で確認したドメインの登録日を使った診断です" : "";
       $("result").textContent = sc.text;
       return;
     }
     const found = (await Promise.all(sc.domains.map(registration))).filter(Boolean);
     if (!found.length) {
-      $("note").textContent = "この端末からも登録日は取得出来ず";
+      $("note").textContent = "この端末からもドメインの登録日は取得出来ず";
       $("result").textContent = sc.text;
       return;
     }
@@ -80,11 +80,12 @@ const HTML = `<!DOCTYPE html>
         evidence: sc.evidence,
         targets: sc.targets,
         official_domains: sc.official_domains,
+        shared_url: sc.shared_url,
         question: sc.question,
         device_registrations: found,
       },
     });
-    $("note").textContent = "この端末で確認した登録日で採点し直しました: " + found.map((f) => f.domain + " " + f.registration).join("、");
+    $("note").textContent = "この端末で確認したドメインの登録日で採点し直しました: " + found.map((f) => f.domain + " " + f.registration).join("、");
     $("result").textContent = again?.structuredContent?.text ?? sc.text;
   };
   await app.connect();

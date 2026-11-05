@@ -89,9 +89,10 @@
   },
   {
     "id": "url-only",
-    "name": "URL のみ",
+    "name": "URL のみ（架空の組織名入り）",
     "expected": [
-      "保留"
+      "白",
+      "グレー"
     ],
     "text": "https://sample-bank-verify.example/login"
   },
@@ -172,5 +173,56 @@
       "白"
     ],
     "text": "サンプル通販 <info@shop-sample.example>\nご注文ありがとうございました。ご注文の内容は下記でご覧いただけます。このメールへの返信は不要です。\nhttps://shop-sample.example/o/1234"
+  },
+  {
+    "id": "url-webmail",
+    "name": "Web メールの画面の URL",
+    "expected": [
+      "保留"
+    ],
+    "text": "https://mail.google.com/mail/u/0/#inbox/FMfcgzQXJWDsKmPqRtVbNcLx"
+  },
+  {
+    "id": "url-google-form",
+    "name": "誰でも作れるフォームの URL",
+    "expected": [
+      "白",
+      "グレー"
+    ],
+    "text": "https://docs.google.com/forms/d/e/1FAIpQLSf-sample/viewform"
+  },
+  {
+    "id": "url-redirect",
+    "name": "転送用の URL（組織名入りの行き先）",
+    "expected": [
+      "グレー",
+      "黒"
+    ],
+    "text": "https://www.google.com/url?q=https://amazon-co-jp.account-verify.example/signin&sa=D"
+  },
+  {
+    "id": "url-official",
+    "name": "組織の公式サイトの URL",
+    "expected": [
+      "白"
+    ],
+    "text": "https://www.amazon.co.jp/gp/css/order-history"
+  },
+  {
+    "id": "url-brand-subdomain",
+    "name": "組織名をサブドメインに置いた URL",
+    "expected": [
+      "グレー",
+      "黒"
+    ],
+    "text": "https://amazon.co.jp.sign-in-check.example/ap/signin"
+  },
+  {
+    "id": "url-no-brand",
+    "name": "組織名のない URL",
+    "expected": [
+      "白"
+    ],
+    "text": "https://sample-shop-campaign.example/entry"
   }
 ]

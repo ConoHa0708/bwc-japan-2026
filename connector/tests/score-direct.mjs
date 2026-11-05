@@ -15,6 +15,8 @@ const LEADS = [
   ["黒", "フィッシング詐欺の疑い大"],
   ["グレー", "詐欺となる根拠が"],
   ["白", "現時点で詐欺と判断できる内容は"],
+  ["白", "URL からは詐欺と判断できる点は見つかりませんでした"],
+  ["保留", "メールの画面の URL は"],
 ];
 
 const CASES = [
@@ -70,6 +72,56 @@ const CASES = [
     targets: ["https://exаmple.com/"],
     lookalike: true,
   },
+  // 以下は URL だけを共有されたとき（shared_url）。note はカードに出るはずの文の一部。
+  {
+    name: "Web メールの画面の URL",
+    expect: "保留",
+    hits: [],
+    evidence: [],
+    shared_url: "https://mail.google.com/mail/u/0/#inbox/FMfcgzQXJWDsKmPqRtVbNcLx",
+    note: "原文（ソース）を共有してください",
+  },
+  {
+    name: "誰でも作れるフォームの URL",
+    expect: "白",
+    hits: [],
+    evidence: [],
+    shared_url: "https://docs.google.com/forms/d/e/1FAIpQLSf-sample/viewform",
+    note: "誰でもページやフォームを作って公開できるサービスです",
+  },
+  {
+    name: "転送用の URL の中の行き先を調べる",
+    expect: "グレー",
+    hits: ["org_claim", "domain_differs_from_main"],
+    evidence: [],
+    shared_url: "https://www.google.com/url?q=https://login.sample-bank-verify.example/&sa=D",
+    note: "転送用の URL でした",
+  },
+  {
+    name: "確かめた公式ドメインの URL",
+    expect: "白",
+    hits: ["org_claim"],
+    evidence: [],
+    shared_url: "https://www.example.com/account",
+    official_domains: ["example.com"],
+    note: "確認した公式ドメイン example.com の URL です",
+  },
+  {
+    name: "@ の前に別のドメインに見える文字列を置いた URL",
+    expect: "黒",
+    hits: ["org_claim", "lure_to_login"],
+    evidence: [],
+    targets: ["https://www.example.com%2Flogin@sample-login.example/"],
+    note: "@ の前に、別のドメインに見える文字列",
+  },
+  {
+    name: "メールアドレスは @ の前のおとりとして数えない",
+    expect: "白",
+    hits: [],
+    evidence: [],
+    targets: ["first.last@example.com"],
+    noteAbsent: "@ の前に、別のドメインに見える文字列",
+  },
 ];
 
 for (const c of CASES) {
@@ -83,7 +135,7 @@ for (const c of CASES) {
       method: "tools/call",
       params: {
         name: "score_observations",
-        arguments: { checklist, evidence: c.evidence, targets: c.targets, official_domains: c.official_domains },
+        arguments: { checklist, evidence: c.evidence, targets: c.targets, official_domains: c.official_domains, shared_url: c.shared_url },
       },
     }),
   });
@@ -94,6 +146,7 @@ for (const c of CASES) {
   // カードには区分を出さないため、判定文から区分を読み取る。
   const verdict = LEADS.find(([, lead]) => text.includes(`【判断】${lead}`))?.[0];
   const lookalikeOk = c.lookalike === undefined || text.includes("見た目の似た別の文字") === c.lookalike;
-  console.log(`${verdict === c.expect && lookalikeOk ? "OK" : "NG"} ${c.name}（期待: ${c.expect}）`);
+  const noteOk = (c.note === undefined || text.includes(c.note)) && (c.noteAbsent === undefined || !text.includes(c.noteAbsent));
+  console.log(`${verdict === c.expect && lookalikeOk && noteOk ? "OK" : "NG"} ${c.name}（期待: ${c.expect}）`);
   for (const l of lines) console.log(`   ${l}`);
 }

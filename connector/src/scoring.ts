@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { NEW_DOMAIN_DAYS, asciiLookalikeOf, checkDomain, nonJapaneseIdnLabels } from "./domain";
 import { expandShortUrl } from "./shorturl";
+import { classifySharedUrl, unwrapRedirect, userinfoDecoy } from "./urlkind";
 import { PROTOCOL_VERSION } from "./protocol";
 
 export const SIGNALS = {
@@ -31,6 +32,7 @@ export const SIGNALS = {
   brand_misspelling: { points: 20, label: "組織名やロゴの綴りが正式な名前と違う" },
   unnatural_japanese: { points: 15, label: "日本語の語の使い方が不自然" },
   lookalike_domain: { points: 40, label: "URL のドメインに、見た目の似た別の文字が使われている" },
+  url_userinfo_decoy: { points: 40, label: "URL の @ の前に、別のドメインに見える文字列を置いている" },
   urgency: { points: 15, label: "急がせる表現がある", rule: "期限、停止、制限など、急いで行動させる表現がある" },
   sms_foreign_mobile: { points: 80, label: "SMS の発信者が海外の携帯番号", rule: "SMS の発信者が海外の携帯番号" },
   sms_domestic_mobile: { points: 10, label: "SMS の発信者が国内の携帯番号", rule: "SMS の発信者が国内の携帯番号" },
@@ -40,7 +42,7 @@ export const SIGNALS = {
 export type SignalId = keyof typeof SIGNALS;
 // コネクターが自分で調べて加点する観点。Claude の確認表には含めない。
 // short_url は一覧にない短縮サービスもあるため、Claude の確認表にも残し、コネクターの調べと合わせて数える。
-const SERVER_SIGNALS = new Set<SignalId>(["random_subdomain", "new_domain", "lookalike_domain"]);
+const SERVER_SIGNALS = new Set<SignalId>(["random_subdomain", "new_domain", "lookalike_domain", "url_userinfo_decoy"]);
 export const SIGNAL_IDS = (Object.keys(SIGNALS) as SignalId[]).filter(
   (id) => !SERVER_SIGNALS.has(id),
 ) as [SignalId, ...SignalId[]];
@@ -94,6 +96,12 @@ const ACTIONS = {
     "メールの宛先など追加の情報を共有いただければ、もう一度診断します。",
   ],
 } as const;
+
+// URL だけを共有されて、怪しい点が見つからなかったときの対処方法。
+const URL_ONLY_WHITE_ACTIONS = [
+  "安全を保証するものではありません。",
+  "メールや SMS で届いた URL なら、届いたメールの原文（ソース）や画面を共有いただければ、差出人や文面まで確かめて診断します。",
+] as const;
 
 // 観点に応じて対処方法に足す文。
 const EXTRA_ACTIONS: Partial<Record<SignalId, string>> = {
@@ -161,6 +169,7 @@ const DECISIVE = new Set<SignalId>([
   "brand_misspelling",
   "unnatural_japanese",
   "lookalike_domain",
+  "url_userinfo_decoy",
 ]);
 
 // 同じ事実を重ねて数えないよう、上位の観点があれば下位の観点を外す。
@@ -171,7 +180,15 @@ const SUPERSEDED_BY: Partial<Record<SignalId, SignalId>> = {
   money_transfer_request: "authority_money_request",
 };
 
-export function score(observations: Observation[], config: ScoringConfig = SAMPLE_CONFIG, question?: QuestionId) {
+// URL だけを共有されたときの扱い。notes は【URL について】に出す事実で、点数には使わない。
+export type ScoreOptions = { urlOnly?: boolean; notes?: string[] };
+
+export function score(
+  observations: Observation[],
+  config: ScoringConfig = SAMPLE_CONFIG,
+  question?: QuestionId,
+  { urlOnly = false, notes = [] }: ScoreOptions = {},
+) {
   const { black_min: BLACK_MIN, gray_min: GRAY_MIN } = config;
   const seen = new Map<SignalId, string>();
   for (const o of observations) if (!seen.has(o.id)) seen.set(o.id, o.evidence.trim().slice(0, 200));
@@ -192,7 +209,10 @@ export function score(observations: Observation[], config: ScoringConfig = SAMPL
         ? details.length >= 2
           ? "詐欺となる根拠が複数確認されています。アクセスはお控えください"
           : "詐欺となる根拠が確認されています。アクセスはお控えください"
-        : "現時点で詐欺と判断できる内容は含まれていませんでした";
+        : urlOnly
+          ? // ページの中身は見ていないため、URL だけのときは白と言い切らない。
+            "URL からは詐欺と判断できる点は見つかりませんでした。ページの中身は確かめていません"
+          : "現時点で詐欺と判断できる内容は含まれていませんでした";
 
   const lines = [
     `【スコアリング】${total}点`,
@@ -206,11 +226,12 @@ export function score(observations: Observation[], config: ScoringConfig = SAMPL
       : ["・加点なし"]),
     ...(capped ? [`・合計は${sum}点ですが、偽物であることを示す根拠が見えないため、${BLACK_MIN - 1}点で止めています`] : []),
     "",
+    ...(notes.length ? ["【URL について】", ...notes.map((n) => `・${n}`), ""] : []),
     // 質問は Claude の回答に任せると出たり出なかったりしたため、グレーのときはカードに必ず出す。
     ...(verdict === "グレー" ? ["【確認したいこと】", QUESTIONS[question ?? DEFAULT_QUESTION], ""] : []),
     "【対処方法】",
     ...(verdict === "白" ? [] : extraActions(details.map((d) => d.id)).map((a) => `・${a}`)),
-    ...ACTIONS[verdict].map((a) => `・${a}`),
+    ...(verdict === "白" && urlOnly ? URL_ONLY_WHITE_ACTIONS : ACTIONS[verdict]).map((a) => `・${a}`),
     "",
     `作法 v${PROTOCOL_VERSION} で確認`,
   ];
@@ -228,13 +249,31 @@ export async function scoreWithDomains(
   officials: string[] = [],
   config: ScoringConfig = SAMPLE_CONFIG,
   question?: QuestionId,
+  sharedUrl?: string,
 ) {
+  const notes: string[] = [];
+  if (sharedUrl) {
+    // URL だけを共有されたときは、まずその URL がどんな場所かを見分ける。
+    const unwrapped = unwrapRedirect(sharedUrl);
+    const kind = classifySharedUrl(unwrapped.url, officials);
+    if (kind?.kind === "webmail") return { ...webmailResult(), domains: [], usedDevice: false };
+    if (unwrapped.via.length) notes.push(`転送用の URL でした（${unwrapped.via.join(" → ")}）。中に入っていた行き先を、開かずに調べました：${unwrapped.url.slice(0, 200)}`);
+    if (kind?.kind === "shared_host") {
+      notes.push(`${kind.host} は、誰でもページやフォームを作って公開できるサービスです。ドメインが本物でも、中身は第三者が作れます。パスワードやカード番号は入力しないでください。`);
+    }
+    if (kind?.kind === "official") notes.push(`${kind.host} は、確認した公式ドメイン ${kind.official} の URL です。安全を保証するものではありません。`);
+    if (!targets.includes(sharedUrl)) targets = [sharedUrl, ...targets];
+  }
   const extra: Observation[] = [];
   const domains: { registered_domain: string; tld: string }[] = [];
   const fromDevice = new Map(
     device.filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.registration)).map((r) => [r.domain.toLowerCase(), r.registration]),
   );
-  for (const original of targets.slice(0, 5)) {
+  for (const given of targets.slice(0, 5)) {
+    // 転送用の URL は、中に入っている行き先を文字列から取り出して調べる。
+    const original = unwrapRedirect(given).url;
+    const decoy = userinfoDecoy(original);
+    if (decoy) extra.push({ id: "url_userinfo_decoy", evidence: `${decoy.shown}@…（実際の行き先は ${decoy.host}）` });
     // 短縮 URL は短縮サービスにだけ問い合わせて行き先を読む。行き先のサイトは開かない。
     let target = original;
     const expanded = await expandShortUrl(/^https?:\/\//.test(original) ? original : `https://${original}`).catch(() => null);
@@ -289,6 +328,29 @@ export async function scoreWithDomains(
     extra.push({ id: "destination_unknown", evidence: `${reported.evidence}（一覧にない短縮サービスのため、行き先を確かめていません）` });
   }
   // 同じ観点は先に来た根拠を使うため、行き先まで読めたコネクターの根拠を先に置く。
-  return { ...score([...extra, ...filtered], config, question), domains, usedDevice: fromDevice.size > 0 };
+  return {
+    ...score([...extra, ...filtered], config, question, { urlOnly: Boolean(sharedUrl), notes }),
+    domains,
+    usedDevice: fromDevice.size > 0,
+  };
+}
+
+// Web メールの画面の URL は、本人のログインがないと開けないため採点せず、メールの原文の共有を案内する。
+export const WEBMAIL_HEADLINE = "メールの画面の URL は、ご本人のログインが要るため、外からは開けません";
+
+function webmailResult() {
+  const lines = [
+    `【判断】${WEBMAIL_HEADLINE}`,
+    "",
+    "【確認したいこと】",
+    "届いたメールの原文（ソース）を共有してください。メールの画面のメニューにある「ソースを表示」「原文を表示」などで表示できます。",
+    "",
+    "【対処方法】",
+    "・メールの中のリンクやボタンは開かず、何も入力しないでください。",
+    "・原文を共有いただければ、差出人やリンクの行き先まで確かめて診断します。",
+    "",
+    `作法 v${PROTOCOL_VERSION} で確認`,
+  ];
+  return { total: 0, verdict: "保留" as const, ids: [] as SignalId[], text: lines.join("\n") };
 }
 

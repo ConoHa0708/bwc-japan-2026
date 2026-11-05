@@ -20,7 +20,9 @@ const LEADS = [
   ["黒", "フィッシング詐欺の疑い大、入力しないでください"],
   ["グレー", "詐欺となる根拠が"],
   ["白", "現時点で詐欺と判断できる内容は含まれていませんでした"],
-  ["保留", "この URL だけでは判定できません"],
+  // URL だけを共有されて、怪しい点が見つからなかったとき。
+  ["白", "URL からは詐欺と判断できる点は見つかりませんでした"],
+  ["保留", "メールの画面の URL は"],
 ];
 
 // 作法で禁じた推定や助言の表現。見つかった語を一覧に出す。
@@ -121,8 +123,8 @@ function parse(out) {
     question: scored.at(-1)?.question ?? null,
     asked,
     answerAsked,
-    // 質問はグレーのときだけカードに出る。回答に質問を書いたら外れ。
-    questionOk: asked === (verdict === "グレー") && !answerAsked,
+    // 質問はグレーと、Web メールの画面の URL（原文の共有を頼む）のときだけカードに出る。回答に質問を書いたら外れ。
+    questionOk: asked === (verdict === "グレー" || verdict === "保留") && !answerAsked,
     versioned: /作法 v[\d.]+ で確認/.test(shown),
     repeated: Boolean(diagnosis) && answer.includes("【スコアリング】"),
     diagnosis,
