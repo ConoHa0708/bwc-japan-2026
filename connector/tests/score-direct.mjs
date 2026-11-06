@@ -122,10 +122,58 @@ const CASES = [
     targets: ["first.last@example.com"],
     noteAbsent: "@ の前に、別のドメインに見える文字列",
   },
+  {
+    name: "確認表の観点を入れ忘れても採点する（入れ忘れは false）",
+    expect: "グレー",
+    hits: ["org_claim", "lure_to_login", "destination_unknown", "urgency"],
+    omit: ["input_credentials", "dmarc_fail"],
+    evidence: [],
+  },
+  {
+    name: "組織を名乗るメールの差出人が無料のメールサービス",
+    expect: "黒",
+    hits: ["org_claim", "lure_to_login", "destination_unknown", "urgency", "input_id_document"],
+    evidence: [],
+    sender_address: "sample.user@gmail.com",
+    note: "誰でも作れるメールのアドレス",
+  },
+  {
+    name: "組織を名乗らない無料のメールサービスの差出人",
+    expect: "白",
+    hits: [],
+    evidence: [],
+    sender_address: "サンプル <sample.user@gmail.com>",
+    noteAbsent: "誰でも作れるメールのアドレス",
+  },
+  {
+    name: "公式ページで確かめた差出人の不一致と重ねない",
+    expect: "グレー",
+    hits: ["org_claim", "sender_mismatch_verified"],
+    evidence: [{ id: "sender_mismatch_verified", text: "公式 https://www.example.com/ で確認" }],
+    sender_address: "sample.user@gmail.com",
+    noteAbsent: "誰でも作れるメールのアドレス",
+  },
+  {
+    name: "メールサービスの会社自身のドメイン",
+    expect: "白",
+    hits: ["org_claim"],
+    evidence: [],
+    official_domains: ["gmail.com"],
+    sender_address: "sample.user@gmail.com",
+    noteAbsent: "誰でも作れるメールのアドレス",
+  },
+  {
+    name: "メールサービスのサブドメインからの送信",
+    expect: "白",
+    hits: ["org_claim"],
+    evidence: [],
+    sender_address: "notice@mail.yahoo.co.jp",
+    noteAbsent: "誰でも作れるメールのアドレス",
+  },
 ];
 
 for (const c of CASES) {
-  const checklist = Object.fromEntries(ALL.map((id) => [id, c.hits.includes(id)]));
+  const checklist = Object.fromEntries(ALL.filter((id) => !c.omit?.includes(id)).map((id) => [id, c.hits.includes(id)]));
   const response = await fetch(URL_MCP, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
@@ -135,7 +183,7 @@ for (const c of CASES) {
       method: "tools/call",
       params: {
         name: "score_observations",
-        arguments: { checklist, evidence: c.evidence, targets: c.targets, official_domains: c.official_domains, shared_url: c.shared_url },
+        arguments: { checklist, evidence: c.evidence, targets: c.targets, official_domains: c.official_domains, shared_url: c.shared_url, sender_address: c.sender_address },
       },
     }),
   });

@@ -38,8 +38,14 @@ function createServer(config: ScoringConfig) {
       description: "作法の観点すべてを checklist で答え、診断を受け取る。診断結果はカードに表示される。",
       inputSchema: {
         checklist: z
-          .object(Object.fromEntries(SIGNAL_IDS.map((id) => [id, z.boolean()])) as Record<(typeof SIGNAL_IDS)[number], z.ZodBoolean>)
-          .describe("作法の観点すべてに true か false で答える。見えない、確かめられないものは false"),
+          // 入れ忘れが1つあっても呼び出し全体を失敗させないよう、各項目は省略でき、省略は false として数える。
+          .object(
+            Object.fromEntries(SIGNAL_IDS.map((id) => [id, z.boolean().optional()])) as Record<
+              (typeof SIGNAL_IDS)[number],
+              z.ZodOptional<z.ZodBoolean>
+            >,
+          )
+          .describe("作法の観点すべてに true か false で答える。見えない、確かめられないものは false。前の診断で true にした観点は、答えで否定されない限り true のまま送る"),
         evidence: z
           .array(z.object({ id: z.string(), text: z.string() }))
           .describe("true にした観点の根拠。画面や本文の原文を短く"),
@@ -55,6 +61,10 @@ function createServer(config: ScoringConfig) {
           .string()
           .optional()
           .describe("利用者が本文や画面なしに URL だけを共有したときの、その URL。コネクターが URL の種類を見分ける"),
+        sender_address: z
+          .string()
+          .optional()
+          .describe("メールの差出人のアドレス（@ を含む全体）。見えたとき、または利用者が答えたときに入れる"),
         question: z
           .enum(QUESTION_IDS)
           .optional()
@@ -67,7 +77,7 @@ function createServer(config: ScoringConfig) {
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
       _meta: { ui: { resourceUri: DIAGNOSIS_UI } },
     },
-    async ({ checklist, evidence, targets, official_domains, shared_url, question, device_registrations }) => {
+    async ({ checklist, evidence, targets, official_domains, shared_url, sender_address, question, device_registrations }) => {
       const result = await scoreWithDomains(
         observationsFrom(checklist, evidence),
         targets ?? [],
@@ -76,6 +86,7 @@ function createServer(config: ScoringConfig) {
         config,
         question,
         shared_url,
+        sender_address,
       );
       const missing = missingOfficialUrl(checklist, evidence);
       // 根拠の本文は記録しない。
@@ -110,6 +121,7 @@ function createServer(config: ScoringConfig) {
           targets: targets ?? [],
           official_domains: official_domains ?? [],
           shared_url,
+          sender_address,
           question,
         },
       };
