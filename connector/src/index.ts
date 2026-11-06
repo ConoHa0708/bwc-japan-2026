@@ -4,7 +4,7 @@ import { z } from "zod";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import { DIAGNOSIS_UI, registerDiagnosisView } from "./app";
 import { PROTOCOL_TEXT, PROTOCOL_VERSION } from "./protocol";
-import { QUESTION_IDS, SIGNAL_IDS, type ScoringConfig, loadScoringConfig, observationsFrom, scoreWithDomains } from "./scoring";
+import { QUESTION_IDS, SIGNAL_IDS, type ScoringConfig, loadScoringConfig, missingOfficialUrl, observationsFrom, scoreWithDomains } from "./scoring";
 
 function createServer(config: ScoringConfig) {
   const server = new McpServer({ name: "bwc-probe", version: PROTOCOL_VERSION });
@@ -77,16 +77,28 @@ function createServer(config: ScoringConfig) {
         question,
         shared_url,
       );
+      const missing = missingOfficialUrl(checklist, evidence);
       // 根拠の本文は記録しない。
       console.log(
-        JSON.stringify({ tool: "score_observations", total: result.total, verdict: result.verdict, ids: result.ids, device: result.usedDevice }),
+        JSON.stringify({
+          tool: "score_observations",
+          total: result.total,
+          verdict: result.verdict,
+          ids: result.ids,
+          missing_url: missing,
+          device: result.usedDevice,
+        }),
       );
+      // 確認元の URL がなくて数えなかった観点は、Claude に知らせて呼び直させる。
+      const retry = missing.length
+        ? `${missing.join("、")} は、evidence に確認元の URL がないため数えていません。確かめた組織自身のページの URL を、出典ではなく evidence の文の中に https:// から原文のまま書いて、score_observations をもう一度呼んでください。`
+        : "";
       return {
         // 診断結果、質問、対処方法はカードに出すため、Claude の回答には何も足させない。
         content: [
           {
             type: "text",
-            text: `診断結果はカードに表示しました（${result.verdict}、${result.total}点）。回答は「診断カードをご確認ください。」の1文だけにする。文面、質問、対処方法、注意は書かない。`,
+            text: `診断結果はカードに表示しました（${result.verdict}、${result.total}点）。${retry}回答は「診断カードをご確認ください。」の1文だけにする。文面、質問、対処方法、注意は書かない。`,
           },
         ],
         structuredContent: {

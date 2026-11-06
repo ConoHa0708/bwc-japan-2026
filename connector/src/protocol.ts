@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = "0.41.0";
+export const PROTOCOL_VERSION = "0.42.0";
 
 export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッシング）
 
@@ -24,7 +24,7 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 
 ■ 観点
 - org_claim: 実在の組織を名乗っている
-- login_mismatch_verified: そのサービスのログイン先を組織自身の公式サイトで確認し、実際のドメインが一致しない。evidence に確認した組織自身のページの URL を必ず書く。書けないときは false
+- login_mismatch_verified: そのサービスのログイン先を組織自身の公式サイトで確認し、実際のドメインが一致しない。evidence に確認した組織自身のページの URL を必ず書く。URL は出典としてではなく、evidence の文の中に https:// から原文のまま書く。書けないときは false
 - domain_differs_from_main: 検索で確かめた組織の公式ドメインと、リンク先やアドレスバーのドメインが異なる（ログイン先までは確かめられない場合）。差出人のアドレスには使わない。login_mismatch_verified が true なら false にする
 - org_in_subdomain: 組織名がサブドメインにあり、登録ドメインは別
 - short_url: 短縮 URL サービスの URL が見える。evidence に URL を原文のまま書く
@@ -34,7 +34,7 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 - input_id_document: 本人確認書類の画像の提出を求める文が見える
 - authority_money_request: 警察、検察、官公庁などを名乗り、振込、送金、資金の移動を求めている
 - money_transfer_request: 振込、送金、指定口座への資金の移動を求めている
-- sender_mismatch_verified: メールの差出人アドレスの @ 以降のドメインを、名乗る組織自身の公式サイトで確認したドメインと照合し、一致しない。確認元は、組織自身のドメインの上にあり、公式のドメインやメールの送信元ドメインが書かれたページ。組織自身がフィッシングへの注意を呼びかけるページも確認元にしてよい。evidence に確認した組織自身のページの URL を必ず書く。書けないときは false。電話番号や SMS の発信者には使わない。組織以外のサイト（ニュース、まとめ記事、他社など）に同じ文面が載っていることにも使わない
+- sender_mismatch_verified: メールの差出人アドレスの @ 以降のドメインを、名乗る組織自身の公式サイトで確認したドメインと照合し、一致しない。確認元は、組織自身のドメインの上にあり、公式のドメインやメールの送信元ドメインが書かれたページ。組織自身がフィッシングへの注意を呼びかけるページも確認元にしてよい。evidence に確認した組織自身のページの URL を必ず書く。URL は出典としてではなく、evidence の文の中に https:// から原文のまま書く。書けないときは false。電話番号や SMS の発信者には使わない。組織以外のサイト（ニュース、まとめ記事、他社など）に同じ文面が載っていることにも使わない
 - financial_credential_request: 金融機関を名乗るメールか SMS の本文そのものが、ID、パスワード、暗証番号、カード番号などの入力や返信を明記している。ログインへの誘導だけなら送らない
 - tax_or_delivery_sms_link: 国税庁か配達業者の名称が見える SMS に、実際のリンクが見える
 - offstore_app: アプリの導入へ誘導するリンクの行き先が App Store や Google Play ではない
