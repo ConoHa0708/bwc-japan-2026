@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = "0.40.0";
+export const PROTOCOL_VERSION = "0.41.0";
 
 export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッシング）
 
@@ -6,7 +6,7 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 - メールの原文（ヘッダー付きのソースや .eml）: リンクやボタンの行き先は、表示の文字ではなく href の URL を targets に入れる。差出人は From のアドレスで照合する。
 - メールや SMS の本文のコピー、画面の写真: 見えた文字のとおりに観測する。
 - URL だけ（この会話でまだ診断していないとき。診断した後なら次の項目に従う）: そのページは取得しない。URL を targets と shared_url に入れて score_observations を呼ぶ。Web メールの画面、転送用の URL、誰でもページを作れるサービスかどうかはコネクターが見分ける。URL の文字列に組織名やサービス名がそのまま書かれているときだけ org_claim を true にし、evidence にその部分を書き、手順2で公式のドメインを確かめる。
-- すでに診断した後に利用者が URL や差出人のアドレスだけを送ってきたら、新しい共有ではなく質問への答えとして扱う。前の診断の checklist と evidence を残したまま、答えで分かったことを足して手順6で呼び直す。URL は targets に足し、shared_url は使わない。
+- すでに診断した後に利用者が URL や差出人のアドレスだけを送ってきたら、新しい共有ではなく質問への答えとして扱う。前の診断の checklist と evidence を残したまま、答えで分かったことを足して手順6で呼び直す。URL は targets に足し、shared_url は使わない。差出人のアドレスを答えてもらったら、名乗る組織の公式ドメインを組織自身のサイトで確かめて sender_mismatch_verified を判定し、確かめたページの URL を evidence に書く。
 
 ■ 流れ
 1. 画面や本文を、下の観点に沿って観測する。
@@ -34,7 +34,7 @@ export const PROTOCOL_TEXT = `判定の作法 v${PROTOCOL_VERSION}（フィッ�
 - input_id_document: 本人確認書類の画像の提出を求める文が見える
 - authority_money_request: 警察、検察、官公庁などを名乗り、振込、送金、資金の移動を求めている
 - money_transfer_request: 振込、送金、指定口座への資金の移動を求めている
-- sender_mismatch_verified: メールの差出人アドレスの @ 以降のドメインを、名乗る組織自身の公式サイトで確認したドメインと照合し、一致しない。evidence に確認した組織自身のページの URL を必ず書く。書けないときは false。電話番号や SMS の発信者、注意喚起のページに同じ文面があることには使わない
+- sender_mismatch_verified: メールの差出人アドレスの @ 以降のドメインを、名乗る組織自身の公式サイトで確認したドメインと照合し、一致しない。確認元は、組織自身のドメインの上にあり、公式のドメインやメールの送信元ドメインが書かれたページ。組織自身がフィッシングへの注意を呼びかけるページも確認元にしてよい。evidence に確認した組織自身のページの URL を必ず書く。書けないときは false。電話番号や SMS の発信者には使わない。組織以外のサイト（ニュース、まとめ記事、他社など）に同じ文面が載っていることにも使わない
 - financial_credential_request: 金融機関を名乗るメールか SMS の本文そのものが、ID、パスワード、暗証番号、カード番号などの入力や返信を明記している。ログインへの誘導だけなら送らない
 - tax_or_delivery_sms_link: 国税庁か配達業者の名称が見える SMS に、実際のリンクが見える
 - offstore_app: アプリの導入へ誘導するリンクの行き先が App Store や Google Play ではない
