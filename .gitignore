@@ -14,3 +14,11 @@ connector/tests/results/
 # Node
 node_modules/
 *.log
+
+# Demo video: renders, raw phone recordings and their transcodes stay local
+video/out/
+video/raw/
+video/public/*.mp4
+
+# Local test mailbox for filming (contains a test password)
+.demo-mail/
