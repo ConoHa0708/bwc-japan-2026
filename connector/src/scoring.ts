@@ -140,6 +140,12 @@ export type Checklist = Partial<Record<SignalId, boolean>>;
 // 公式ページで確かめたことが前提の観点。根拠に URL がなければ加点しない。
 const NEEDS_OFFICIAL_URL = new Set<SignalId>(["login_mismatch_verified", "sender_mismatch_verified"]);
 
+// true なのに、根拠に確認元の URL がないため数えなかった観点。
+export function missingOfficialUrl(checklist: Checklist, evidence: { id: string; text: string }[] = []): SignalId[] {
+  const texts = new Map<string, string>(evidence.map((e) => [e.id, e.text]));
+  return [...NEEDS_OFFICIAL_URL].filter((id) => checklist[id] && !/https?:\/\//.test(texts.get(id) ?? ""));
+}
+
 export function observationsFrom(checklist: Checklist, evidence: { id: string; text: string }[] = []): Observation[] {
   const texts = new Map<string, string>(evidence.map((e) => [e.id, e.text]));
   return SIGNAL_IDS.flatMap((id) => {
