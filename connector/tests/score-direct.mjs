@@ -78,7 +78,7 @@ const CASES = [
     expect: "保留",
     hits: [],
     evidence: [],
-    shared_url: "https://mail.google.com/mail/u/0/#inbox/FMfcgzQXJWDsKmPqRtVbNcLx",
+    shared_url: "https://mail.google.com/mail/u/0/#inbox/FMfcgzSAMPLE000000000000",
     note: "原文（ソース）を共有してください",
   },
   {
@@ -134,7 +134,7 @@ const CASES = [
     expect: "黒",
     hits: ["org_claim", "lure_to_login", "destination_unknown", "urgency", "input_id_document"],
     evidence: [],
-    sender_address: "sample.user@gmail.com",
+    sender_address: "freemail_test@gmail.com",
     note: "誰でも作れるメールのアドレス",
   },
   {
@@ -142,7 +142,7 @@ const CASES = [
     expect: "白",
     hits: [],
     evidence: [],
-    sender_address: "サンプル <sample.user@gmail.com>",
+    sender_address: "サンプル <freemail_test@gmail.com>",
     noteAbsent: "誰でも作れるメールのアドレス",
   },
   {
@@ -150,7 +150,7 @@ const CASES = [
     expect: "グレー",
     hits: ["org_claim", "sender_mismatch_verified"],
     evidence: [{ id: "sender_mismatch_verified", text: "公式 https://www.example.com/ で確認" }],
-    sender_address: "sample.user@gmail.com",
+    sender_address: "freemail_test@gmail.com",
     noteAbsent: "誰でも作れるメールのアドレス",
   },
   {
@@ -159,7 +159,7 @@ const CASES = [
     hits: ["org_claim"],
     evidence: [],
     official_domains: ["gmail.com"],
-    sender_address: "sample.user@gmail.com",
+    sender_address: "freemail_test@gmail.com",
     noteAbsent: "誰でも作れるメールのアドレス",
   },
   {
@@ -167,7 +167,7 @@ const CASES = [
     expect: "白",
     hits: ["org_claim"],
     evidence: [],
-    sender_address: "notice@mail.yahoo.co.jp",
+    sender_address: "freemail_test@mail.yahoo.co.jp",
     noteAbsent: "誰でも作れるメールのアドレス",
   },
 ];

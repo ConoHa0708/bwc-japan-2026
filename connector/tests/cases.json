@@ -69,7 +69,7 @@
     "expected": [
       "グレー"
     ],
-    "text": "サンプル市 福祉課\n令和8年度の給付金について、対象世帯の皆さまへお知らせします。受け取りには口座の登録が必要です。担当者がご案内しますので、窓口の LINE をお友だち登録してください。\nLINE ID: sample-city-kyufu"
+    "text": "サンプル市 福祉課\n令和8年度の給付金について、対象世帯の皆さまへお知らせします。受け取りには口座の登録が必要です。担当者がご案内しますので、窓口の LINE をお友だち登録してください。\nLINE ID: example_kyufu_0000"
   },
   {
     "id": "shared-doc",
@@ -180,7 +180,7 @@
     "expected": [
       "保留"
     ],
-    "text": "https://mail.google.com/mail/u/0/#inbox/FMfcgzQXJWDsKmPqRtVbNcLx"
+    "text": "https://mail.google.com/mail/u/0/#inbox/FMfcgzSAMPLE000000000000"
   },
   {
     "id": "url-google-form",
