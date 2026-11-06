@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { NEW_DOMAIN_DAYS, asciiLookalikeOf, checkDomain, nonJapaneseIdnLabels } from "./domain";
 import { expandShortUrl } from "./shorturl";
+import { freemailDomain } from "./freemail";
 import { classifySharedUrl, unwrapRedirect, userinfoDecoy } from "./urlkind";
 import { PROTOCOL_VERSION } from "./protocol";
 
@@ -33,6 +34,7 @@ export const SIGNALS = {
   unnatural_japanese: { points: 15, label: "日本語の語の使い方が不自然" },
   lookalike_domain: { points: 40, label: "URL のドメインに、見た目の似た別の文字が使われている" },
   url_userinfo_decoy: { points: 40, label: "URL の @ の前に、別のドメインに見える文字列を置いている" },
+  freemail_sender: { points: 40, label: "組織を名乗っているのに、誰でも作れるメールのアドレスから送られている" },
   urgency: { points: 15, label: "急がせる表現がある", rule: "期限、停止、制限など、急いで行動させる表現がある" },
   sms_foreign_mobile: { points: 80, label: "SMS の発信者が海外の携帯番号", rule: "SMS の発信者が海外の携帯番号" },
   sms_domestic_mobile: { points: 10, label: "SMS の発信者が国内の携帯番号", rule: "SMS の発信者が国内の携帯番号" },
@@ -42,7 +44,7 @@ export const SIGNALS = {
 export type SignalId = keyof typeof SIGNALS;
 // コネクターが自分で調べて加点する観点。Claude の確認表には含めない。
 // short_url は一覧にない短縮サービスもあるため、Claude の確認表にも残し、コネクターの調べと合わせて数える。
-const SERVER_SIGNALS = new Set<SignalId>(["random_subdomain", "new_domain", "lookalike_domain", "url_userinfo_decoy"]);
+const SERVER_SIGNALS = new Set<SignalId>(["random_subdomain", "new_domain", "lookalike_domain", "url_userinfo_decoy", "freemail_sender"]);
 export const SIGNAL_IDS = (Object.keys(SIGNALS) as SignalId[]).filter(
   (id) => !SERVER_SIGNALS.has(id),
 ) as [SignalId, ...SignalId[]];
@@ -176,6 +178,7 @@ const DECISIVE = new Set<SignalId>([
   "unnatural_japanese",
   "lookalike_domain",
   "url_userinfo_decoy",
+  "freemail_sender",
 ]);
 
 // 同じ事実を重ねて数えないよう、上位の観点があれば下位の観点を外す。
@@ -184,6 +187,8 @@ const SUPERSEDED_BY: Partial<Record<SignalId, SignalId>> = {
   lure_to_other_contact: "group_invite_request",
   app_install_request: "offstore_app",
   money_transfer_request: "authority_money_request",
+  // 差出人のドメインの不一致を公式ページで確かめられたときは、そちらで数える。
+  freemail_sender: "sender_mismatch_verified",
 };
 
 // URL だけを共有されたときの扱い。notes は【URL について】に出す事実で、点数には使わない。
@@ -256,8 +261,17 @@ export async function scoreWithDomains(
   config: ScoringConfig = SAMPLE_CONFIG,
   question?: QuestionId,
   sharedUrl?: string,
+  senderAddress?: string,
 ) {
   const notes: string[] = [];
+  const extra: Observation[] = [];
+  // 組織を名乗るメールの差出人が無料のメールサービスなら、公式サイトを調べなくても偽物と分かる。
+  // 名乗る組織の公式ドメインそのもの（メールサービスの会社自身）なら数えない。
+  const freemail = senderAddress ? freemailDomain(senderAddress) : null;
+  const officialSet = new Set(officials.map((o) => o.toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "")));
+  if (freemail && observations.some((o) => o.id === "org_claim") && !officialSet.has(freemail)) {
+    extra.push({ id: "freemail_sender", evidence: `差出人のドメイン ${freemail}` });
+  }
   if (sharedUrl) {
     // URL だけを共有されたときは、まずその URL がどんな場所かを見分ける。
     const unwrapped = unwrapRedirect(sharedUrl);
@@ -270,7 +284,6 @@ export async function scoreWithDomains(
     if (kind?.kind === "official") notes.push(`${kind.host} は、確認した公式ドメイン ${kind.official} の URL です。安全を保証するものではありません。`);
     if (!targets.includes(sharedUrl)) targets = [sharedUrl, ...targets];
   }
-  const extra: Observation[] = [];
   const domains: { registered_domain: string; tld: string }[] = [];
   const fromDevice = new Map(
     device.filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.registration)).map((r) => [r.domain.toLowerCase(), r.registration]),
