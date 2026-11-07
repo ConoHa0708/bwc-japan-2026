@@ -25,7 +25,7 @@ const T: React.FC<{ size: number; color?: string; style?: React.CSSProperties; c
 // ---- timeline (seconds) ----
 const STEPS = [
   { box: 1, at: 2.0, end: 5.0, text: "① 届いたメッセージを\n　 受け取る" },
-  { box: 2, at: 5.0, end: 8.2, text: "② 判定の作法と\n　 26 の観点を返す" },
+  { box: 2, at: 5.0, end: 8.2, text: "② 判定の作法と\n　 27 の観点を返す" },
   { box: 1, at: 8.2, end: 11.6, text: "③ 読み取り、公式サイトで\n　 確かめ、観点に答える" },
   { box: 2, at: 11.6, end: 15.0, text: "④ 開かずに調べ、採点し\n　 カードを作る" },
 ];
