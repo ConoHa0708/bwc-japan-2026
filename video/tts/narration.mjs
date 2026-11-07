@@ -27,7 +27,7 @@ const READ = [
   ["100 点", "ひゃくてん"],
   ["59 点", "ごじゅうきゅうてん"],
   ["15 点", "じゅうごてん"],
-  ["26 の", "にじゅうろくの"],
+  ["27 の", "にじゅうななの"],
   ["URL", "ユーアールエル"],
   ["4つ", "よっつ"],
 ];
@@ -53,7 +53,7 @@ const LINES = [
   [57.4, "今度は、スクショで渡します。"],
   [60.4, "撮ったスクショを、そのまま Claude アプリへ。"],
   [64.2, "口座を凍結すると脅し、安全な口座への振り替えを迫ります。"],
-  [69.4, "26 の観点で、点数を付けていきます。", { int: 0.5 }],
+  [69.4, "27 の観点で、点数を付けていきます。", { int: 0.5 }],
   [75.2, "安全な口座への振り込みを求めた時点で、100 点。警察が振り込みを求めることは、ありません。"],
   [81.2, "銀行を名乗るメールです。"],
   [83.0, "スクショと本文、両方で試します。"],
@@ -72,7 +72,7 @@ const LINES = [
   [141.3, "本物のリンクは、ちゃんと見分けます。"],
   [144.1, "仕組みです。"],
   [146.0, "Claude アプリは、メッセージを受け取り、"],
-  [149.0, "コネクターから、判定の作法と 26 の観点を受け取ります。"],
+  [149.0, "コネクターから、判定の作法と 27 の観点を受け取ります。"],
   [152.9, "読み取り、公式サイトで確かめ、答えるだけ。"],
   [156.2, "採点と判定は、コネクターが行います。リンク先は開きません。", { int: 0.4 }],
   [160.3, "結果は、診断カードに。"],
@@ -86,7 +86,11 @@ const LINES = [
 mkdirSync(outDir, { recursive: true });
 // Synthesis differs slightly on every run. A line whose take was approved by ear is locked here and reused as is.
 const HERE = fileURLToPath(new URL(".", import.meta.url));
-const TAKES = { "操作は、これだけです。": "takes/sousa_koredake.wav" };
+const TAKES = {
+  "操作は、これだけです。": "takes/sousa_koredake.wav",
+  "27 の観点で、点数を付けていきます。": "takes/kanten27_a.wav",
+  "コネクターから、判定の作法と 27 の観点を受け取ります。": "takes/kanten27_b.wav",
+};
 const parts = [];
 const used = new Set();
 for (const [i, [start, text, opt]] of LINES.entries()) {
