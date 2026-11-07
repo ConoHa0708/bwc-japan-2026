@@ -1,6 +1,7 @@
 // 観測された観点を加点し、診断結果の文面を組み立てる。
 // ここに書いた配点としきい値は公開用の見本。公開中のコネクターは、非公開の設定 SCORING_CONFIG があればそちらで採点する。
 import { z } from "zod";
+import { parse } from "tldts";
 import { NEW_DOMAIN_DAYS, asciiLookalikeOf, checkDomain, nonJapaneseIdnLabels } from "./domain";
 import { expandShortUrl } from "./shorturl";
 import { freemailDomain } from "./freemail";
@@ -32,6 +33,7 @@ export const SIGNALS = {
   unusual_characters: { points: 15, label: "日本で一般的に使わない漢字や字形が混ざっている", rule: "日本で一般的に使わない漢字や字形（簡体字など）が本文に混ざっている。evidence にその文字を含む原文を書く。単なる誤字や変換ミスはfalse にする" },
   brand_misspelling: { points: 20, label: "組織名やロゴの綴りが正式な名前と違う" },
   unnatural_japanese: { points: 15, label: "日本語の語の使い方が不自然" },
+  prompt_injection: { points: 40, label: "AI への指示が文面に埋め込まれている" },
   lookalike_domain: { points: 40, label: "URL のドメインに、見た目の似た別の文字が使われている" },
   url_userinfo_decoy: { points: 40, label: "URL の @ の前に、別のドメインに見える文字列を置いている" },
   freemail_sender: { points: 40, label: "組織を名乗っているのに、誰でも作れるメールのアドレスから送られている" },
@@ -176,6 +178,8 @@ const DECISIVE = new Set<SignalId>([
   "dmarc_fail",
   "brand_misspelling",
   "unnatural_japanese",
+  // 正規の連絡が AI に判定の仕方を指示することはないため、それだけで偽物の証拠として扱う。
+  "prompt_injection",
   "lookalike_domain",
   "url_userinfo_decoy",
   "freemail_sender",
@@ -265,6 +269,9 @@ export async function scoreWithDomains(
 ) {
   const notes: string[] = [];
   const extra: Observation[] = [];
+  let officialKind: { host: string; official: string } | null = null;
+  // 登録日が新しいと分かった登録ドメイン。公式の確認元としては扱わない。
+  const newDomains = new Set<string>();
   // 組織を名乗るメールの差出人が無料のメールサービスなら、公式サイトを調べなくても偽物と分かる。
   // 名乗る組織の公式ドメインそのもの（メールサービスの会社自身）なら数えない。
   const freemail = senderAddress ? freemailDomain(senderAddress) : null;
@@ -281,7 +288,8 @@ export async function scoreWithDomains(
     if (kind?.kind === "shared_host") {
       notes.push(`${kind.host} は、誰でもページやフォームを作って公開できるサービスです。ドメインが本物でも、中身は第三者が作れます。パスワードやカード番号は入力しないでください。`);
     }
-    if (kind?.kind === "official") notes.push(`${kind.host} は、確認した公式ドメイン ${kind.official} の URL です。安全を保証するものではありません。`);
+    // 公式の案内は、登録日を調べて新しいドメインでないと分かってから出す。
+    if (kind?.kind === "official") officialKind = kind;
     if (!targets.includes(sharedUrl)) targets = [sharedUrl, ...targets];
   }
   const domains: { registered_domain: string; tld: string }[] = [];
@@ -335,12 +343,32 @@ export async function scoreWithDomains(
     }
     if (registration) {
       const ageDays = Math.floor((Date.now() - Date.parse(registration)) / 86_400_000);
-      if (ageDays <= NEW_DOMAIN_DAYS) {
+      // 未来の日付は、登録日として読めないものとして数えない。
+      if (ageDays >= 0 && ageDays <= NEW_DOMAIN_DAYS) {
         extra.push({ id: "new_domain", evidence: `${info.registered_domain}：${registration} 登録（${ageDays}日前、${where}）` });
+        newDomains.add(info.registered_domain.toLowerCase());
       }
     }
   }
-  const filtered = observations.filter((o) => !SERVER_SIGNALS.has(o.id));
+  // 公式ドメインと確認元の URL は Claude の申告のため、コネクターで分かる矛盾があれば信用しない。
+  if (officialKind) {
+    notes.push(
+      newDomains.has(registeredOf(officialKind.official) ?? officialKind.official.toLowerCase())
+        ? `${officialKind.host} は公式ドメインとして渡されましたが、登録から日が浅いため、公式として扱いませんでした。`
+        : `${officialKind.host} は、確認した公式ドメイン ${officialKind.official} の URL です。安全を保証するものではありません。`,
+    );
+  }
+  const senderDomain = senderAddress ? registeredOf(senderAddress.match(/@([^@\s>]+)\s*>?$/)?.[1] ?? "") : null;
+  const filtered = observations.filter((o) => {
+    if (SERVER_SIGNALS.has(o.id)) return false;
+    if (!NEEDS_OFFICIAL_URL.has(o.id)) return true;
+    const sources = (o.evidence.match(/https?:\/\/[^\s)）」』>"']+/g) ?? []).map(registeredOf).filter((d): d is string => Boolean(d));
+    // 差出人のドメインそのもののページを確認元にして「一致しない」とするのは矛盾している。
+    const untrusted = (d: string) => newDomains.has(d) || (o.id === "sender_mismatch_verified" && d === senderDomain);
+    if (sources.length === 0 || !sources.every(untrusted)) return true;
+    notes.push(`「${SIGNALS[o.id].label}」は、確認元のページ（${sources.join("、")}）が${newDomains.has(sources[0]) ? "登録から日が浅いドメイン" : "差出人と同じドメイン"}のため、数えていません。`);
+    return false;
+  });
   // Claude が短縮 URL と申告したのに、一覧の短縮サービスとして調べられなかったものは、行き先を開かずに不明として数える。
   const reported = filtered.find((o) => o.id === "short_url");
   if (reported && !extra.some((o) => o.id === "short_url")) {
@@ -355,6 +383,16 @@ export async function scoreWithDomains(
 }
 
 // Web メールの画面の URL は、本人のログインがないと開けないため採点せず、メールの原文の共有を案内する。
+// ホスト名か URL の登録ドメイン（小文字）。読めなければ null。
+function registeredOf(input: string): string | null {
+  try {
+    const host = new URL(/^https?:\/\//i.test(input) ? input : `https://${input}`).hostname;
+    return parse(host, { allowPrivateDomains: true }).domain?.toLowerCase() ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export const WEBMAIL_HEADLINE = "メールの画面の URL は、ご本人のログインが要るため、外からは開けません";
 
 function webmailResult() {
