@@ -32,6 +32,7 @@ export const SIGNALS = {
   unusual_characters: { points: 15, label: "日本で一般的に使わない漢字や字形が混ざっている", rule: "日本で一般的に使わない漢字や字形（簡体字など）が本文に混ざっている。evidence にその文字を含む原文を書く。単なる誤字や変換ミスはfalse にする" },
   brand_misspelling: { points: 20, label: "組織名やロゴの綴りが正式な名前と違う" },
   unnatural_japanese: { points: 15, label: "日本語の語の使い方が不自然" },
+  prompt_injection: { points: 40, label: "AI への指示が文面に埋め込まれている" },
   lookalike_domain: { points: 40, label: "URL のドメインに、見た目の似た別の文字が使われている" },
   url_userinfo_decoy: { points: 40, label: "URL の @ の前に、別のドメインに見える文字列を置いている" },
   freemail_sender: { points: 40, label: "組織を名乗っているのに、誰でも作れるメールのアドレスから送られている" },
@@ -176,6 +177,8 @@ const DECISIVE = new Set<SignalId>([
   "dmarc_fail",
   "brand_misspelling",
   "unnatural_japanese",
+  // 正規の連絡が AI に判定の仕方を指示することはないため、それだけで偽物の証拠として扱う。
+  "prompt_injection",
   "lookalike_domain",
   "url_userinfo_decoy",
   "freemail_sender",
