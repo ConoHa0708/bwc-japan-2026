@@ -36,6 +36,7 @@ function createServer(config: ScoringConfig) {
     {
       title: "観測を採点して診断",
       description: "作法の観点すべてを checklist で答え、診断を受け取る。診断結果はカードに表示される。",
+      // 公開のサーバーのため、件数と長さに上限を置く。上限は作法どおりの呼び出しより十分大きい。
       inputSchema: {
         checklist: z
           // 入れ忘れが1つあっても呼び出し全体を失敗させないよう、各項目は省略でき、省略は false として数える。
@@ -47,22 +48,27 @@ function createServer(config: ScoringConfig) {
           )
           .describe("作法の観点すべてに true か false で答える。見えない、確かめられないものは false。前の診断で true にした観点は、答えで否定されない限り true のまま送る"),
         evidence: z
-          .array(z.object({ id: z.string(), text: z.string() }))
+          .array(z.object({ id: z.string().max(64), text: z.string().max(1000) }))
+          .max(60)
           .describe("true にした観点の根拠。画面や本文の原文を短く"),
         targets: z
-          .array(z.string())
+          .array(z.string().max(2000))
+          .max(50)
           .optional()
           .describe("画面や本文に見えた URL やホスト名。短縮 URL、サブドメイン、登録日はコネクターが調べる"),
         official_domains: z
-          .array(z.string())
+          .array(z.string().max(253))
+          .max(10)
           .optional()
           .describe("組織自身の公式サイトで確かめた公式ドメイン。似せた綴りとの比較に使う"),
         shared_url: z
           .string()
+          .max(2000)
           .optional()
           .describe("利用者が本文や画面なしに URL だけを共有したときの、その URL。コネクターが URL の種類を見分ける"),
         sender_address: z
           .string()
+          .max(320)
           .optional()
           .describe("メールの差出人のアドレス（@ を含む全体）。見えたとき、または利用者が答えたときに入れる"),
         question: z
@@ -70,7 +76,8 @@ function createServer(config: ScoringConfig) {
           .optional()
           .describe("作法の質問の候補から1つ。グレーのときだけカードに出る"),
         device_registrations: z
-          .array(z.object({ domain: z.string(), registration: z.string() }))
+          .array(z.object({ domain: z.string().max(253), registration: z.string().max(40) }))
+          .max(10)
           .optional()
           .describe("診断カードが端末で確認した登録日。Claude は送らない"),
       },

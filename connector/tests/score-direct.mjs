@@ -183,6 +183,48 @@ const CASES = [
     sender_address: "freemail_test@mail.yahoo.co.jp",
     noteAbsent: "誰でも作れるメールのアドレス",
   },
+  {
+    name: "壊れたパーセント表記の URL でも採点を止めない",
+    expect: "白",
+    hits: [],
+    evidence: [],
+    targets: ["https://%ZZ@example.com/"],
+  },
+  {
+    name: "壊れたパーセント表記を含む @ の前のおとり",
+    expect: "黒",
+    hits: ["org_claim", "lure_to_login"],
+    evidence: [],
+    targets: ["https://www.example.com%ZZ@sample-login.example/"],
+    note: "@ の前に、別のドメインに見える文字列",
+  },
+  {
+    name: "差出人と同じドメインのページを確認元にした差出人の不一致",
+    expect: "白",
+    hits: ["org_claim", "sender_mismatch_verified"],
+    evidence: [{ id: "sender_mismatch_verified", text: "公式 https://www.sample-bank.example/ で確認" }],
+    sender_address: "info@sample-bank.example",
+    note: "差出人と同じドメインのため、数えていません",
+  },
+  {
+    name: "登録から日が浅いドメインは公式として扱わない",
+    expect: "白",
+    hits: [],
+    evidence: [],
+    shared_url: "https://www.sample-new.example/",
+    official_domains: ["sample-new.example"],
+    device: [{ domain: "sample-new.example", registration: new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10) }],
+    note: "公式として扱いませんでした",
+  },
+  {
+    name: "未来の登録日は新しいドメインとして数えない",
+    expect: "白",
+    hits: [],
+    evidence: [],
+    targets: ["https://www.sample-future.example/"],
+    device: [{ domain: "sample-future.example", registration: new Date(Date.now() - -30 * 86_400_000).toISOString().slice(0, 10) }],
+    noteAbsent: "登録日が新しい",
+  },
 ];
 
 for (const c of CASES) {
@@ -196,7 +238,7 @@ for (const c of CASES) {
       method: "tools/call",
       params: {
         name: "score_observations",
-        arguments: { checklist, evidence: c.evidence, targets: c.targets, official_domains: c.official_domains, shared_url: c.shared_url, sender_address: c.sender_address },
+        arguments: { checklist, evidence: c.evidence, targets: c.targets, official_domains: c.official_domains, shared_url: c.shared_url, sender_address: c.sender_address, device_registrations: c.device },
       },
     }),
   });

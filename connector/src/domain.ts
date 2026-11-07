@@ -9,12 +9,14 @@ const HEADERS = {
   Accept: "application/rdap+json, application/json",
   "User-Agent": "bwc-probe/0.1 (RDAP lookup)",
 };
+// IANA やレジストリが応答しないときに、診断を待たせすぎない。
+const TIMEOUT_MS = 5000;
 
 let bootstrap: Map<string, string> | null = null;
 
 async function rdapBase(tld: string): Promise<string | null> {
   if (!bootstrap) {
-    const response = await fetch(BOOTSTRAP_URL, { headers: HEADERS });
+    const response = await fetch(BOOTSTRAP_URL, { headers: HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) });
     const data = (await response.json()) as { services: [string[], string[]][] };
     bootstrap = new Map();
     for (const [tlds, urls] of data.services) for (const t of tlds) bootstrap.set(t, urls[0]);
@@ -129,7 +131,7 @@ export async function checkDomain(input: string, { rdap: useRdap = true } = {}) 
   if (!rdap) return { ...base, registration: "取得出来ず", reason: `no_rdap_for_${tld}` };
 
   try {
-    const response = await fetch(`${rdap.replace(/\/$/, "")}/domain/${registered}`, { headers: HEADERS });
+    const response = await fetch(`${rdap.replace(/\/$/, "")}/domain/${registered}`, { headers: HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!response.ok) return { ...base, registration: "取得出来ず", reason: `rdap_${response.status}` };
     const data = (await response.json()) as { events?: { eventAction: string; eventDate: string }[] };
     const date = data.events?.find((e) => e.eventAction === "registration")?.eventDate;
@@ -139,7 +141,7 @@ export async function checkDomain(input: string, { rdap: useRdap = true } = {}) 
       ...base,
       registration: date.slice(0, 10),
       age_days: ageDays,
-      new_domain: ageDays <= NEW_DOMAIN_DAYS,
+      new_domain: ageDays >= 0 && ageDays <= NEW_DOMAIN_DAYS,
       new_domain_threshold_days: NEW_DOMAIN_DAYS,
     };
   } catch {

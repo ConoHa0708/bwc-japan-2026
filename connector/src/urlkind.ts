@@ -83,7 +83,14 @@ export function userinfoDecoy(input: string): { shown: string; host: string } | 
   if (!/^https?:\/\//i.test(input)) return null;
   const url = toUrl(input);
   if (!url || (!url.username && !url.password)) return null;
-  const shown = decodeURIComponent(`${url.username}${url.password ? `:${url.password}` : ""}`);
+  const raw = `${url.username}${url.password ? `:${url.password}` : ""}`;
+  // %ZZ のような壊れた表記で採点全体を止められないよう、読めなければそのままの文字で調べる。
+  let shown: string;
+  try {
+    shown = decodeURIComponent(raw);
+  } catch {
+    shown = raw;
+  }
   if (!/[a-z0-9-]+\.[a-z]{2,}/i.test(shown)) return null;
   return { shown: shown.slice(0, 80), host: url.hostname };
 }

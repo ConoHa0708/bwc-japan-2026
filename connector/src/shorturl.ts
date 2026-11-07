@@ -24,6 +24,8 @@ const SHORTENERS = new Set([
   "x.gd",
 ]);
 const MAX_HOPS = 3;
+// 短縮サービスが応答しないときに、診断を待たせすぎない。
+const TIMEOUT_MS = 5000;
 
 export type ExpandResult =
   | { status: "expanded"; final_url: string; hops: number }
@@ -59,6 +61,7 @@ export async function expandShortUrl(input: string): Promise<ExpandResult> {
         method: "GET",
         redirect: "manual",
         headers: { "Accept-Encoding": "gzip, deflate" },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
       });
     } catch {
       return { status: "failed", reason: "fetch_error", last_url: current.href, hops };
