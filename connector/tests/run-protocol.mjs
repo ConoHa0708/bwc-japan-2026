@@ -137,12 +137,13 @@ function parse(out) {
   };
 }
 
-// テスト環境ではコネクターの読み込みがときどき失敗するため、未接続ならやり直す。
+// テスト環境ではコネクターの読み込みがときどき失敗するため、作法の道具を呼べなかったらやり直す。
+// 起動時の接続状態は、道具を呼べた回でも未接続と出ることがあるため、呼び出しの有無で見分ける。
 async function runOnce(testCase) {
   let result;
   for (let attempt = 0; attempt < 3; attempt++) {
     result = await runOnceRaw(testCase);
-    if (result.connected) break;
+    if (result.called) break;
   }
   return result;
 }
