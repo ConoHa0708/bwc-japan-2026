@@ -227,6 +227,7 @@ const CASES = [
   },
 ];
 
+let failed = 0;
 for (const c of CASES) {
   const checklist = Object.fromEntries(ALL.filter((id) => !c.omit?.includes(id)).map((id) => [id, c.hits.includes(id)]));
   const response = await fetch(URL_MCP, {
@@ -250,6 +251,12 @@ for (const c of CASES) {
   const verdict = LEADS.find(([, lead]) => text.includes(`【判断】${lead}`))?.[0];
   const lookalikeOk = c.lookalike === undefined || text.includes("見た目の似た別の文字") === c.lookalike;
   const noteOk = (c.note === undefined || text.includes(c.note)) && (c.noteAbsent === undefined || !text.includes(c.noteAbsent));
-  console.log(`${verdict === c.expect && lookalikeOk && noteOk ? "OK" : "NG"} ${c.name}（期待: ${c.expect}）`);
+  const ok = verdict === c.expect && lookalikeOk && noteOk;
+  if (!ok) failed++;
+  console.log(`${ok ? "OK" : "NG"} ${c.name}（期待: ${c.expect}）`);
   for (const l of lines) console.log(`   ${l}`);
 }
+
+// NG が1件でもあれば失敗で終わり、自動で流したときにも気づけるようにする。
+console.log(`\n${CASES.length - failed}/${CASES.length} OK`);
+if (failed > 0) process.exitCode = 1;
